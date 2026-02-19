@@ -1,0 +1,138 @@
+{
+  "id": "test01",
+  "title": "感染対策テスト（サンプル）",
+  "description": "感染対策に関する基礎知識のテストです。\n合格ラインは80%です。全設問にお答えください。",
+  "is_test_mode": true,
+  "pass_score": 80,
+  "show_correct_after": true,
+  "allow_multiple_answers": false,
+  "questions": [
+    {
+      "id": "t001",
+      "type": "name_selector",
+      "text": "あなたの部署と氏名を選択してください",
+      "required": true,
+      "options": [],
+      "scale_min": 1,
+      "scale_max": 5,
+      "scale_min_label": "",
+      "scale_max_label": "",
+      "reference_file": "",
+      "correct_answers": [],
+      "points": 0,
+      "branches": [],
+      "show_if_question_id": "",
+      "show_if_value": ""
+    },
+    {
+      "id": "t002",
+      "type": "radio",
+      "text": "標準予防策（スタンダードプリコーション）の基本的な考え方として正しいものはどれですか？",
+      "required": true,
+      "options": [
+        "感染症患者にのみ適用する",
+        "すべての患者の血液・体液等を感染性があるものとして取り扱う",
+        "医師のみが実施する対策である",
+        "手袋を着用すれば手洗いは不要である"
+      ],
+      "scale_min": 1,
+      "scale_max": 5,
+      "scale_min_label": "",
+      "scale_max_label": "",
+      "reference_file": "",
+      "correct_answers": ["すべての患者の血液・体液等を感染性があるものとして取り扱う"],
+      "points": 20,
+      "branches": [],
+      "show_if_question_id": "",
+      "show_if_value": ""
+    },
+    {
+      "id": "t003",
+      "type": "radio",
+      "text": "手指衛生のタイミングとして WHO の「5つのタイミング」に含まれないものはどれですか？",
+      "required": true,
+      "options": [
+        "患者に触れる前",
+        "清潔・無菌操作の前",
+        "体液に曝露した後",
+        "患者の部屋を出る前"
+      ],
+      "scale_min": 1,
+      "scale_max": 5,
+      "scale_min_label": "",
+      "scale_max_label": "",
+      "reference_file": "",
+      "correct_answers": ["患者の部屋を出る前"],
+      "points": 20,
+      "branches": [],
+      "show_if_question_id": "",
+      "show_if_value": ""
+    },
+    {
+      "id": "t004",
+      "type": "checkbox",
+      "text": "N95 マスクが必要な場面はどれですか？（複数選択）",
+      "required": true,
+      "options": [
+        "結核患者のケア",
+        "麻疹患者のケア",
+        "水痘患者のケア",
+        "一般的な風邪患者のケア"
+      ],
+      "scale_min": 1,
+      "scale_max": 5,
+      "scale_min_label": "",
+      "scale_max_label": "",
+      "reference_file": "",
+      "correct_answers": ["結核患者のケア", "麻疹患者のケア", "水痘患者のケア"],
+      "points": 20,
+      "branches": [],
+      "show_if_question_id": "",
+      "show_if_value": ""
+    },
+    {
+      "id": "t005",
+      "type": "radio",
+      "text": "針刺し事故が発生した際、最初に行うべき対応はどれですか？",
+      "required": true,
+      "options": [
+        "上司に報告する",
+        "受傷部位を石けんと流水で十分に洗浄する",
+        "消毒液を傷口に注入する",
+        "救急外来を受診する"
+      ],
+      "scale_min": 1,
+      "scale_max": 5,
+      "scale_min_label": "",
+      "scale_max_label": "",
+      "reference_file": "",
+      "correct_answers": ["受傷部位を石けんと流水で十分に洗浄する"],
+      "points": 20,
+      "branches": [],
+      "show_if_question_id": "",
+      "show_if_value": ""
+    },
+    {
+      "id": "t006",
+      "type": "radio",
+      "text": "アルコール手指消毒薬が効果のない病原体はどれですか？",
+      "required": true,
+      "options": [
+        "MRSA",
+        "インフルエンザウイルス",
+        "ノロウイルス（非エンベロープウイルス）",
+        "大腸菌"
+      ],
+      "scale_min": 1,
+      "scale_max": 5,
+      "scale_min_label": "",
+      "scale_max_label": "",
+      "reference_file": "",
+      "correct_answers": ["ノロウイルス（非エンベロープウイルス）"],
+      "points": 20,
+      "branches": [],
+      "show_if_question_id": "",
+      "show_if_value": ""
+    }
+  ]
+}
