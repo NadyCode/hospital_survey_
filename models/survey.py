@@ -111,6 +111,10 @@ class Survey:
     pass_score: int = 60           # 合格点（%）
     show_correct_after: bool = True  # 終了後に正解を表示するか
     allow_multiple_answers: bool = False  # 同一ユーザーの複数回答を許可
+    # 終了画面
+    completion_text: str = ""              # 終了メッセージ
+    completion_image_path: str = ""        # 終了画面に表示する画像ファイルのパス
+    completion_pdf_path: str = ""          # 終了画面に表示する PDF ファイルのパス
     questions: List[Question] = field(default_factory=list)
 
     @property
@@ -127,6 +131,9 @@ class Survey:
             "pass_score": self.pass_score,
             "show_correct_after": self.show_correct_after,
             "allow_multiple_answers": self.allow_multiple_answers,
+            "completion_text": self.completion_text,
+            "completion_image_path": self.completion_image_path,
+            "completion_pdf_path": self.completion_pdf_path,
             "questions": [q.to_dict() for q in self.questions],
         }
 
@@ -141,6 +148,9 @@ class Survey:
             pass_score=d.get("pass_score", 60),
             show_correct_after=d.get("show_correct_after", True),
             allow_multiple_answers=d.get("allow_multiple_answers", False),
+            completion_text=d.get("completion_text", ""),
+            completion_image_path=d.get("completion_image_path", ""),
+            completion_pdf_path=d.get("completion_pdf_path", ""),
             questions=[Question.from_dict(q) for q in d.get("questions", [])],
         )
 

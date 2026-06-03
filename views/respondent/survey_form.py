@@ -529,13 +529,28 @@ class SurveyFormWindow:
         except Exception:
             pass
 
-        # テストモード: 結果表示
+        # 終了画面を開くヘルパー
+        from views.respondent.completion_view import CompletionWindow, _has_content
+        has_comp = _has_content(self.survey)
+
+        def _open_completion(parent_to_destroy=None):
+            if parent_to_destroy:
+                parent_to_destroy.destroy()
+            if has_comp:
+                comp_win = tk.Toplevel()
+                CompletionWindow(comp_win, self.survey,
+                                 on_close=lambda: (self.root.destroy(), comp_win.destroy()))
+            else:
+                messagebox.showinfo("送信完了", "回答を送信しました。ご協力ありがとうございます！")
+                self.root.destroy()
+
+        # テストモード: 結果表示 → 終了画面
         if self.survey.is_test_mode and self.survey.show_correct_after:
             from views.respondent.result_view import TestResultWindow
             self.root.withdraw()
             win = tk.Toplevel()
             TestResultWindow(win, self.survey, answers, self.department, self.name,
-                             on_close=lambda: (self.root.destroy(), win.destroy()))
+                             on_close=lambda: _open_completion(win))
         else:
-            messagebox.showinfo("送信完了", "回答を送信しました。ご協力ありがとうございます！")
-            self.root.destroy()
+            self.root.withdraw()
+            _open_completion()

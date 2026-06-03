@@ -4,6 +4,9 @@
 # グラフ描画
 matplotlib>=3.5.0
 
+# 終了画面の画像表示（JPEG・PNG・BMP・WebP 等に対応）
+Pillow>=9.0.0
+
 # データ処理（オプション）
 # pandas>=1.3.0
 

@@ -100,6 +100,40 @@ class SurveyEditorWindow:
         self._toggle_test_mode()
         self._toggle_anon_mode()
 
+        # ── 終了画面設定 ──
+        comp_frame = tk.LabelFrame(left, text="  終了画面設定  ", font=FONT_NORMAL,
+                                   bg=BG, fg="#00695C", padx=8, pady=6)
+        comp_frame.pack(fill="x", padx=8, pady=(0, 4))
+
+        tk.Label(comp_frame, text="メッセージ:", font=FONT_NORMAL, bg=BG).grid(
+            row=0, column=0, sticky="nw", pady=3)
+        self._comp_text = tk.Text(comp_frame, font=FONT_NORMAL, width=26, height=3,
+                                  relief="solid", bd=1)
+        self._comp_text.insert("1.0", self.survey.completion_text)
+        self._comp_text.grid(row=0, column=1, sticky="ew", pady=3, padx=(4, 0))
+
+        tk.Label(comp_frame, text="画像ファイル:", font=FONT_NORMAL, bg=BG).grid(
+            row=1, column=0, sticky="w", pady=3)
+        img_row = tk.Frame(comp_frame, bg=BG)
+        img_row.grid(row=1, column=1, sticky="ew", pady=3, padx=(4, 0))
+        self._comp_img_var = tk.StringVar(value=self.survey.completion_image_path)
+        tk.Entry(img_row, textvariable=self._comp_img_var, font=FONT_NORMAL, width=18,
+                 relief="solid", bd=1).pack(side="left", fill="x", expand=True)
+        tk.Button(img_row, text="参照…", font=FONT_SMALL, relief="flat",
+                  command=lambda: self._browse_image(self._comp_img_var)).pack(side="left", padx=2)
+
+        tk.Label(comp_frame, text="PDF / テキスト:", font=FONT_NORMAL, bg=BG).grid(
+            row=2, column=0, sticky="w", pady=3)
+        pdf_row = tk.Frame(comp_frame, bg=BG)
+        pdf_row.grid(row=2, column=1, sticky="ew", pady=3, padx=(4, 0))
+        self._comp_pdf_var = tk.StringVar(value=self.survey.completion_pdf_path)
+        tk.Entry(pdf_row, textvariable=self._comp_pdf_var, font=FONT_NORMAL, width=18,
+                 relief="solid", bd=1).pack(side="left", fill="x", expand=True)
+        tk.Button(pdf_row, text="参照…", font=FONT_SMALL, relief="flat",
+                  command=lambda: self._browse_pdf(self._comp_pdf_var)).pack(side="left", padx=2)
+
+        comp_frame.columnconfigure(1, weight=1)
+
         # 設問リスト
         q_frame = tk.LabelFrame(left, text="  設問一覧  ", font=FONT_NORMAL, bg=BG, fg=PRIMARY)
         q_frame.pack(fill="both", expand=True, padx=8, pady=(0, 8))
@@ -537,6 +571,24 @@ class SurveyEditorWindow:
         if path:
             var.set(path)
 
+    def _browse_image(self, var: tk.StringVar):
+        from tkinter import filedialog
+        path = filedialog.askopenfilename(
+            title="画像ファイルを選択",
+            filetypes=[("画像ファイル", "*.png *.jpg *.jpeg *.gif *.bmp *.webp"),
+                       ("全ファイル", "*.*")])
+        if path:
+            var.set(path)
+
+    def _browse_pdf(self, var: tk.StringVar):
+        from tkinter import filedialog
+        path = filedialog.askopenfilename(
+            title="PDF / テキストファイルを選択",
+            filetypes=[("PDF", "*.pdf"), ("テキスト", "*.txt"),
+                       ("全ファイル", "*.*")])
+        if path:
+            var.set(path)
+
     # ──────────────────────────────────────
     # 変更の適用
     # ──────────────────────────────────────
@@ -577,6 +629,9 @@ class SurveyEditorWindow:
         self.survey.description = self.desc_text.get("1.0", "end").strip()
         self.survey.is_test_mode = self.is_test_var.get()
         self.survey.is_anonymous = self.is_anon_var.get()
+        self.survey.completion_text = self._comp_text.get("1.0", "end").strip()
+        self.survey.completion_image_path = self._comp_img_var.get().strip()
+        self.survey.completion_pdf_path = self._comp_pdf_var.get().strip()
         self.survey.pass_score = self.pass_score_var.get()
         self.survey.show_correct_after = self.show_correct_var.get()
         self.survey.allow_multiple_answers = self.multi_answer_var.get()
