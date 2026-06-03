@@ -206,7 +206,8 @@ class SurveyEditorWindow:
             canvas.itemconfig(win_id, width=canvas.winfo_width())
         ))
         canvas.bind("<Configure>", lambda e: canvas.itemconfig(win_id, width=e.width))
-        canvas.bind("<MouseWheel>", lambda e: canvas.yview_scroll(-1 * (e.delta // 120), "units"))
+        from views.styles import register_scrollable
+        register_scrollable(canvas)
 
         pad = dict(padx=16, pady=5)
 

@@ -3,6 +3,87 @@
 """
 import tkinter as tk
 from tkinter import ttk
+import sys
+
+# ────────────────────────────────────────────────────────────────
+# グローバルマウスホイールスクロール管理
+# ────────────────────────────────────────────────────────────────
+_scroll_canvases: list = []
+
+# ネイティブスクロールを持つウィジェット（これらには介入しない）
+_NATIVE_SCROLL_TYPES = (tk.Listbox, tk.Text)
+
+
+def register_scrollable(canvas: tk.Canvas):
+    """スクロール対象の canvas を登録する。"""
+    _scroll_canvases.append(canvas)
+
+    def _on_destroy(e):
+        if canvas in _scroll_canvases:
+            _scroll_canvases.remove(canvas)
+
+    canvas.bind("<Destroy>", _on_destroy, add="+")
+
+
+def init_global_scroll(root: tk.Tk):
+    """
+    ルートウィンドウに bind_all でグローバルスクロールを登録する。
+    main.py で一度だけ呼ぶ。
+    マウス座標から登録済み canvas を特定してスクロールするため、
+    子ウィジェット上でも確実に動作する。
+    """
+
+    def _do_scroll(canvas: tk.Canvas, units: int):
+        try:
+            if canvas.winfo_exists():
+                canvas.yview_scroll(units, "units")
+        except Exception:
+            pass
+
+    def _find_canvas(rx: int, ry: int) -> tk.Canvas | None:
+        """マウス座標 (root 絶対座標) が重なる最前面の canvas を返す"""
+        found = None
+        for c in _scroll_canvases:
+            try:
+                if not c.winfo_exists():
+                    continue
+                cx, cy = c.winfo_rootx(), c.winfo_rooty()
+                cw, ch = c.winfo_width(), c.winfo_height()
+                if cx <= rx <= cx + cw and cy <= ry <= cy + ch:
+                    found = c  # 後勝ち（リスト後方 = より新しく開いたウィンドウ）
+            except Exception:
+                pass
+        return found
+
+    # Windows / macOS: <MouseWheel>
+    def _on_wheel_win(event):
+        if isinstance(event.widget, _NATIVE_SCROLL_TYPES):
+            return  # Listbox や Text の独自スクロールを妨げない
+        c = _find_canvas(event.x_root, event.y_root)
+        if c:
+            _do_scroll(c, -1 * (event.delta // 120))
+            return "break"
+
+    # Linux: Button-4 (up) / Button-5 (down)
+    def _on_wheel_up(event):
+        if isinstance(event.widget, _NATIVE_SCROLL_TYPES):
+            return
+        c = _find_canvas(event.x_root, event.y_root)
+        if c:
+            _do_scroll(c, -1)
+            return "break"
+
+    def _on_wheel_down(event):
+        if isinstance(event.widget, _NATIVE_SCROLL_TYPES):
+            return
+        c = _find_canvas(event.x_root, event.y_root)
+        if c:
+            _do_scroll(c, 1)
+            return "break"
+
+    root.bind_all("<MouseWheel>", _on_wheel_win, add="+")
+    root.bind_all("<Button-4>", _on_wheel_up, add="+")
+    root.bind_all("<Button-5>", _on_wheel_down, add="+")
 
 # カラーパレット
 PRIMARY   = "#1565C0"   # 濃い青
@@ -81,7 +162,7 @@ def apply_theme(root: tk.Tk):
 
 
 def scrollable_frame(parent, **kwargs) -> tuple:
-    """スクロール可能なフレームを作成。(canvas, inner_frame) を返す"""
+    """スクロール可能なフレームを作成。(canvas, inner_frame, container) を返す"""
     container = ttk.Frame(parent)
     container.pack(fill="both", expand=True, **kwargs)
 
@@ -96,11 +177,7 @@ def scrollable_frame(parent, **kwargs) -> tuple:
     canvas.pack(side="left", fill="both", expand=True)
     scrollbar.pack(side="right", fill="y")
 
-    def _on_mousewheel(e):
-        canvas.yview_scroll(int(-1 * (e.delta / 120)), "units")
-
-    canvas.bind("<MouseWheel>", _on_mousewheel)
-    inner.bind("<MouseWheel>", _on_mousewheel)
+    register_scrollable(canvas)
 
     return canvas, inner, container
 

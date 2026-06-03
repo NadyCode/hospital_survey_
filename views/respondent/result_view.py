@@ -145,8 +145,8 @@ class TestResultWindow:
             canvas.itemconfig(win_id, width=canvas.winfo_width())
         ))
         canvas.bind("<Configure>", lambda e: canvas.itemconfig(win_id, width=e.width))
-        canvas.bind("<MouseWheel>", lambda e: canvas.yview_scroll(-1*(e.delta//120), "units"))
-        inner.bind("<MouseWheel>", lambda e: canvas.yview_scroll(-1*(e.delta//120), "units"))
+        from views.styles import register_scrollable
+        register_scrollable(canvas)
 
         for i, (q, answer, is_corr, pts_earned) in enumerate(self.results, 1):
             bg_color = CORRECT if is_corr else INCORRECT

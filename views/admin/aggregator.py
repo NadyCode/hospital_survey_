@@ -161,8 +161,8 @@ class AggregatorContent:
             canvas_outer.itemconfig(win_id, width=canvas_outer.winfo_width())
         ))
         canvas_outer.bind("<Configure>", lambda e: canvas_outer.itemconfig(win_id, width=e.width))
-        canvas_outer.bind("<MouseWheel>", lambda e: canvas_outer.yview_scroll(-1*(e.delta//120), "units"))
-        inner.bind("<MouseWheel>", lambda e: canvas_outer.yview_scroll(-1*(e.delta//120), "units"))
+        from views.styles import register_scrollable
+        register_scrollable(canvas_outer)
 
         self._chart_figures = []
 

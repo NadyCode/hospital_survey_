@@ -38,6 +38,9 @@ def main():
         except Exception:
             pass
 
+    from views.styles import init_global_scroll
+    init_global_scroll(root)
+
     from views.main_window import MainWindow
     app = MainWindow(root)
 

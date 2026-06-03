@@ -165,8 +165,8 @@ class SurveyFormWindow:
             canvas.itemconfig(win_id, width=canvas.winfo_width())
         self.form_inner.bind("<Configure>", on_configure)
         canvas.bind("<Configure>", lambda e: canvas.itemconfig(win_id, width=e.width))
-        canvas.bind("<MouseWheel>", lambda e: canvas.yview_scroll(-1*(e.delta//120), "units"))
-        self.form_inner.bind("<MouseWheel>", lambda e: canvas.yview_scroll(-1*(e.delta//120), "units"))
+        from views.styles import register_scrollable
+        register_scrollable(canvas)
 
         self._widget_map: Dict[str, dict] = {}  # qid -> {type, widget(s), frame}
         self._q_frames: Dict[str, tk.Frame] = {}
