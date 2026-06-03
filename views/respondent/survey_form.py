@@ -65,7 +65,14 @@ class SurveyListWindow:
                 continue
             try:
                 s = Survey.load(os.path.join(survey_dir, fname))
-                mode = "テスト" if s.is_test_mode else "通常"
+                if s.is_test_mode and s.is_anonymous:
+                    mode = "匿名テスト"
+                elif s.is_test_mode:
+                    mode = "テスト"
+                elif s.is_anonymous:
+                    mode = "匿名"
+                else:
+                    mode = "通常"
                 self.tree.insert("", "end", iid=fname,
                                  values=(s.title, mode, len(s.questions)))
                 self.survey_map[fname] = s
@@ -110,13 +117,19 @@ class SurveyFormWindow:
         hdr.pack_propagate(False)
         tk.Label(hdr, text=f"📝 {self.survey.title}", font=FONT_LARGE,
                  bg=PRIMARY, fg="white").pack(side="left", padx=16, pady=10)
+        if self.survey.is_anonymous:
+            tk.Label(hdr, text="匿名", font=FONT_NORMAL,
+                     bg="#F57F17", fg="white", padx=8, pady=3).pack(side="left", padx=4)
         if self.survey.is_test_mode:
             pts = self.survey.total_points
             tk.Label(hdr, text=f"テスト  合計 {pts} 点  合格 {self.survey.pass_score}%",
                      font=FONT_NORMAL, bg=PRIMARY, fg="#FFF9C4").pack(side="right", padx=16)
 
     def _build_name_selector(self):
-        """部署・氏名選択エリア（survey に name_selector 設問がある場合は非表示にする）"""
+        """部署・氏名選択エリア（匿名アンケートまたは name_selector 設問がある場合はスキップ）"""
+        if self.survey.is_anonymous:
+            return  # 匿名アンケートは部署・氏名を収集しない
+
         has_ns = any(q.type == "name_selector" for q in self.survey.questions)
         if has_ns:
             return  # フォーム内の設問として処理
@@ -466,20 +479,25 @@ class SurveyFormWindow:
         answers = self._collect_answers()
 
         # 部署・氏名を取得
-        has_ns = any(q.type == "name_selector" for q in self.survey.questions)
-        if not has_ns:
-            dept = self._top_dept_var.get() if hasattr(self, "_top_dept_var") else ""
-            name = self._top_name_var.get() if hasattr(self, "_top_name_var") else ""
-            if not dept or not name:
-                messagebox.showwarning("入力エラー", "部署と氏名を選択してください")
-                return
-            self.department = dept
-            self.name = name
+        if self.survey.is_anonymous:
+            # 匿名アンケート: 識別情報は保存しない
+            self.department = ""
+            self.name = "匿名"
         else:
-            # name_selector 設問から取得済み
-            if not self.department or not self.name:
-                messagebox.showwarning("入力エラー", "部署と氏名を選択してください")
-                return
+            has_ns = any(q.type == "name_selector" for q in self.survey.questions)
+            if not has_ns:
+                dept = self._top_dept_var.get() if hasattr(self, "_top_dept_var") else ""
+                name = self._top_name_var.get() if hasattr(self, "_top_name_var") else ""
+                if not dept or not name:
+                    messagebox.showwarning("入力エラー", "部署と氏名を選択してください")
+                    return
+                self.department = dept
+                self.name = name
+            else:
+                # name_selector 設問から取得済み
+                if not self.department or not self.name:
+                    messagebox.showwarning("入力エラー", "部署と氏名を選択してください")
+                    return
 
         # 必須バリデーション
         errors = self._validate(answers)
@@ -488,8 +506,8 @@ class SurveyFormWindow:
             messagebox.showwarning("入力エラー", msg)
             return
 
-        # 重複チェック
-        if not self.survey.allow_multiple_answers:
+        # 重複チェック（匿名アンケートはスキップ）
+        if not self.survey.is_anonymous and not self.survey.allow_multiple_answers:
             if has_answered(get_shared_folder(), self.survey.id, self.department, self.name):
                 messagebox.showwarning("回答済み", "すでに回答済みです。")
                 return

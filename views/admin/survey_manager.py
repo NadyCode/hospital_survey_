@@ -63,7 +63,14 @@ class SurveyManagerTab:
             try:
                 s = Survey.load(fpath)
                 answers = load_answers(get_shared_folder(), s.id)
-                mode = "テスト" if s.is_test_mode else "通常"
+                if s.is_test_mode and s.is_anonymous:
+                    mode = "匿名テスト"
+                elif s.is_test_mode:
+                    mode = "テスト"
+                elif s.is_anonymous:
+                    mode = "匿名"
+                else:
+                    mode = "通常"
                 self.tree.insert("", "end", iid=fname,
                                  values=(s.title, len(s.questions), len(answers), mode, fname))
             except Exception:

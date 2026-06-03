@@ -107,6 +107,7 @@ class Survey:
     title: str
     description: str = ""
     is_test_mode: bool = False
+    is_anonymous: bool = False         # 匿名アンケート（部署・氏名を収集しない）
     pass_score: int = 60           # 合格点（%）
     show_correct_after: bool = True  # 終了後に正解を表示するか
     allow_multiple_answers: bool = False  # 同一ユーザーの複数回答を許可
@@ -122,6 +123,7 @@ class Survey:
             "title": self.title,
             "description": self.description,
             "is_test_mode": self.is_test_mode,
+            "is_anonymous": self.is_anonymous,
             "pass_score": self.pass_score,
             "show_correct_after": self.show_correct_after,
             "allow_multiple_answers": self.allow_multiple_answers,
@@ -135,6 +137,7 @@ class Survey:
             title=d.get("title", "無題のアンケート"),
             description=d.get("description", ""),
             is_test_mode=d.get("is_test_mode", False),
+            is_anonymous=d.get("is_anonymous", False),
             pass_score=d.get("pass_score", 60),
             show_correct_after=d.get("show_correct_after", True),
             allow_multiple_answers=d.get("allow_multiple_answers", False),

@@ -78,13 +78,27 @@ class SurveyEditorWindow:
         tk.Checkbutton(self.test_frame, text="終了後に正解を表示", variable=self.show_correct_var,
                        font=FONT_NORMAL, bg=BG).pack(side="left", padx=8)
 
-        self.multi_answer_var = tk.BooleanVar(value=self.survey.allow_multiple_answers)
-        tk.Checkbutton(cfg_frame, text="同一ユーザーの複数回答を許可",
-                       variable=self.multi_answer_var, font=FONT_NORMAL, bg=BG).grid(
+        # 匿名アンケート
+        self.is_anon_var = tk.BooleanVar(value=self.survey.is_anonymous)
+        tk.Checkbutton(cfg_frame, text="匿名アンケート（部署・氏名を収集しない）",
+                       variable=self.is_anon_var, font=FONT_NORMAL, bg=BG,
+                       command=self._toggle_anon_mode).grid(
                            row=4, column=0, columnspan=2, sticky="w", pady=3)
+
+        self.anon_note = tk.Label(cfg_frame,
+                                  text="  ※ 回答者は識別されません。重複回答チェックも行いません。",
+                                  font=("Yu Gothic UI", 9), bg=BG, fg="#F57F17")
+        self.anon_note.grid(row=5, column=0, columnspan=2, sticky="w")
+
+        self.multi_answer_var = tk.BooleanVar(value=self.survey.allow_multiple_answers)
+        self.multi_answer_cb = tk.Checkbutton(cfg_frame, text="同一ユーザーの複数回答を許可",
+                                              variable=self.multi_answer_var,
+                                              font=FONT_NORMAL, bg=BG)
+        self.multi_answer_cb.grid(row=6, column=0, columnspan=2, sticky="w", pady=3)
 
         cfg_frame.columnconfigure(1, weight=1)
         self._toggle_test_mode()
+        self._toggle_anon_mode()
 
         # 設問リスト
         q_frame = tk.LabelFrame(left, text="  設問一覧  ", font=FONT_NORMAL, bg=BG, fg=PRIMARY)
@@ -120,6 +134,14 @@ class SurveyEditorWindow:
             self.test_frame.grid()
         else:
             self.test_frame.grid_remove()
+
+    def _toggle_anon_mode(self):
+        if self.is_anon_var.get():
+            self.anon_note.grid()
+            self.multi_answer_cb.grid_remove()   # 匿名時は重複チェック設定を隠す
+        else:
+            self.anon_note.grid_remove()
+            self.multi_answer_cb.grid()
 
     # ──────────────────────────────────────
     # 設問リスト操作
@@ -554,6 +576,7 @@ class SurveyEditorWindow:
         self.survey.title = self.title_var.get().strip() or "無題のアンケート"
         self.survey.description = self.desc_text.get("1.0", "end").strip()
         self.survey.is_test_mode = self.is_test_var.get()
+        self.survey.is_anonymous = self.is_anon_var.get()
         self.survey.pass_score = self.pass_score_var.get()
         self.survey.show_correct_after = self.show_correct_var.get()
         self.survey.allow_multiple_answers = self.multi_answer_var.get()
