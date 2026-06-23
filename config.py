@@ -2,16 +2,26 @@
 アプリケーション設定
 """
 import os
+import sys
 import json
 
-# デフォルト設定ファイルパス
-CONFIG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "app_config.json")
+# ─── バージョン（リリース時にここを更新してビルドし直す） ───────────────
+APP_VERSION = "1.0.0"
+
+# ─── 設定ファイルの場所 ──────────────────────────────────────────────
+# exe 化時: exe と同じフォルダ（ユーザーが設定を保持できるよう外部ファイル）
+# 開発時 : スクリプトと同じフォルダ
+if getattr(sys, "frozen", False):
+    _APP_DIR = os.path.dirname(sys.executable)
+else:
+    _APP_DIR = os.path.dirname(os.path.abspath(__file__))
+
+CONFIG_FILE = os.path.join(_APP_DIR, "app_config.json")
 
 DEFAULT_CONFIG = {
-    "shared_folder": os.path.join(os.path.dirname(os.path.abspath(__file__)), "data"),
+    "shared_folder": os.path.join(_APP_DIR, "data"),
     "admin_password": "admin1234",
     "app_title": "病院アンケートシステム",
-    "app_version": "1.0.0",
 }
 
 
@@ -61,9 +71,8 @@ ACCESS_LOG_FILE = "access_log.csv"
 SURVEYS_DIR = "surveys"
 
 # ───── 自動更新 ─────
-APP_VERSION = APP_CONFIG.get("app_version", "1.0.0")  # この実行ファイルのバージョン
-UPDATE_DIR_NAME = "_app_update"      # 共有フォルダ内の更新配置フォルダ
-UPDATE_VERSION_FILE = "version.txt"  # 最新バージョンを記載するファイル
+UPDATE_DIR_NAME = "_app_update"       # 共有フォルダ内の更新配置フォルダ
+UPDATE_VERSION_FILE = "version.txt"   # 最新バージョンを記載するファイル
 UPDATE_EXE_NAME = "HospitalSurvey.exe"  # 配布する実行ファイル名
 
 
@@ -80,3 +89,4 @@ def get_surveys_dir() -> str:
 def ensure_shared_folder():
     os.makedirs(get_shared_folder(), exist_ok=True)
     os.makedirs(get_surveys_dir(), exist_ok=True)
+

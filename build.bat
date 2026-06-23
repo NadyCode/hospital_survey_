@@ -1,7 +1,11 @@
 @echo off
 REM ====================================================
 REM 病院アンケートシステム - Windows EXE ビルドスクリプト
-REM PyInstaller を使用してポータブル onedir exe を生成します
+REM
+REM 使い方:
+REM   build.bat             <- バージョン番号なし（config.py の現在値を使う）
+REM   build.bat 1.2.0       <- バージョンを 1.2.0 に更新してからビルド
+REM
 REM 実行前に Python 3.8+ と pip が PATH に通っていることを確認してください
 REM ====================================================
 chcp 65001 > nul
@@ -9,6 +13,23 @@ chcp 65001 > nul
 echo ============================================================
 echo  病院アンケートシステム  EXE ビルド
 echo ============================================================
+
+REM --- バージョン番号の処理 ---
+if "%~1"=="" (
+    REM 引数なし: config.py から現在のバージョンを読み取る
+    for /f "delims=" %%V in ('python -c "from config import APP_VERSION; print(APP_VERSION)"') do set BUILD_VERSION=%%V
+    echo [VER] バージョン引数なし。現在のバージョン %BUILD_VERSION% を使用します。
+) else (
+    set BUILD_VERSION=%~1
+    echo [VER] バージョンを %BUILD_VERSION% に設定します...
+    python -c "import re, sys; path='config.py'; txt=open(path,encoding='utf-8').read(); out=re.sub(r'APP_VERSION\s*=\s*\"[^\"]+\"','APP_VERSION = \"%BUILD_VERSION%\"',txt); open(path,'w',encoding='utf-8').write(out)"
+    if %ERRORLEVEL% neq 0 (
+        echo [ERROR] config.py のバージョン更新に失敗しました。
+        pause
+        exit /b 1
+    )
+    echo [VER] config.py を APP_VERSION = "%BUILD_VERSION%" に更新しました。
+)
 
 REM --- 依存パッケージのインストール ---
 echo [1/3] 依存パッケージをインストール中...
@@ -80,10 +101,19 @@ if %ERRORLEVEL% neq 0 (
     exit /b 1
 )
 
+REM --- version.txt を dist フォルダに書き出す ---
+echo %BUILD_VERSION%> "dist\HospitalSurvey\version.txt"
+echo [VER] dist\HospitalSurvey\version.txt に %BUILD_VERSION% を書き込みました。
+
 echo.
 echo ============================================================
-echo  ビルド完了！
-echo  dist\HospitalSurvey\HospitalSurvey.exe を実行してください。
-echo  フォルダごと配布先にコピーすれば動作します。
+echo  ビルド完了！  バージョン: %BUILD_VERSION%
+echo.
+echo  配布手順:
+echo    1. dist\HospitalSurvey\ フォルダごと各端末にコピー
+echo       （初回配布 / 手動アップデート）
+echo.
+echo    2. 自動アップデートで配布する場合は deploy_update.bat を実行
+echo       （共有フォルダの _app_update\ に EXE+version.txt を配置）
 echo ============================================================
 pause
