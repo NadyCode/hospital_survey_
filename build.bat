@@ -3,61 +3,114 @@ REM ====================================================
 REM 病院アンケートシステム - Windows EXE ビルドスクリプト
 REM
 REM 使い方:
-REM   build.bat             <- バージョン番号なし（config.py の現在値を使う）
-REM   build.bat 1.2.0       <- バージョンを 1.2.0 に更新してからビルド
+REM   build.bat             バージョン番号なし（config.py の現在値を使う）
+REM   build.bat 1.2.0       バージョンを 1.2.0 に更新してからビルド
 REM
-REM 実行前に Python 3.8+ と pip が PATH に通っていることを確認してください
+REM 必要環境: Python 3.8 以上（インストール時に "Add Python to PATH" にチェック）
 REM ====================================================
 chcp 65001 > nul
+
+REM --- BAT ファイルと同じフォルダに移動（どこから実行しても正しく動く） ---
+cd /d "%~dp0"
 
 echo ============================================================
 echo  病院アンケートシステム  EXE ビルド
 echo ============================================================
 
-REM --- バージョン番号の処理 ---
+REM ============================================================
+REM  Python コマンドの自動検出（python / py の両方に対応）
+REM ============================================================
+set PY=
+python --version >nul 2>&1
+if %ERRORLEVEL% equ 0 (
+    set PY=python
+    goto :py_found
+)
+py --version >nul 2>&1
+if %ERRORLEVEL% equ 0 (
+    set PY=py
+    goto :py_found
+)
+
+echo.
+echo [ERROR] Python が見つかりません。
+echo.
+echo  以下の手順でインストールしてください:
+echo    1. https://www.python.org/downloads/ を開く
+echo    2. "Download Python 3.x.x" をクリック
+echo    3. インストーラーを起動し、最初の画面で
+echo       "Add Python to PATH" に必ずチェックを入れる
+echo    4. "Install Now" をクリック
+echo    5. インストール完了後、このバッチを再実行する
+echo.
+pause
+exit /b 1
+
+:py_found
+echo [PY] Python コマンド: %PY%
+for /f "delims=" %%V in ('%PY% --version 2^>^&1') do echo [PY] %%V
+
+REM ============================================================
+REM  バージョン番号の処理
+REM ============================================================
 if "%~1"=="" (
     REM 引数なし: config.py から現在のバージョンを読み取る
-    for /f "delims=" %%V in ('python -c "from config import APP_VERSION; print(APP_VERSION)"') do set BUILD_VERSION=%%V
-    echo [VER] バージョン引数なし。現在のバージョン %BUILD_VERSION% を使用します。
+    for /f "delims=" %%V in ('%PY% _update_version.py --read') do set BUILD_VERSION=%%V
+    if not defined BUILD_VERSION (
+        echo [ERROR] config.py からバージョンを読み取れませんでした。
+        pause
+        exit /b 1
+    )
+    echo [VER] 現在のバージョン %BUILD_VERSION% を使用します。
 ) else (
     set BUILD_VERSION=%~1
     echo [VER] バージョンを %BUILD_VERSION% に設定します...
-    python -c "import re, sys; path='config.py'; txt=open(path,encoding='utf-8').read(); out=re.sub(r'APP_VERSION\s*=\s*\"[^\"]+\"','APP_VERSION = \"%BUILD_VERSION%\"',txt); open(path,'w',encoding='utf-8').write(out)"
+    %PY% _update_version.py %BUILD_VERSION%
     if %ERRORLEVEL% neq 0 (
         echo [ERROR] config.py のバージョン更新に失敗しました。
         pause
         exit /b 1
     )
-    echo [VER] config.py を APP_VERSION = "%BUILD_VERSION%" に更新しました。
 )
 
-REM --- 依存パッケージのインストール ---
+REM ============================================================
+REM  [1/3] 依存パッケージのインストール
+REM ============================================================
+echo.
 echo [1/3] 依存パッケージをインストール中...
-pip install --upgrade pip
-pip install -r requirements.txt
-pip install "pyinstaller>=5.0"
+%PY% -m pip install --upgrade pip
+%PY% -m pip install -r requirements.txt
+%PY% -m pip install "pyinstaller>=5.0"
 if %ERRORLEVEL% neq 0 (
+    echo.
     echo [ERROR] pip install に失敗しました。
+    echo         ネットワーク接続とプロキシ設定を確認してください。
     pause
     exit /b 1
 )
 
-REM --- キャッシュ削除（再ビルド時のゴミを防ぐ） ---
+REM ============================================================
+REM  [2/3] キャッシュ削除（再ビルド時のゴミを防ぐ）
+REM ============================================================
+echo.
 echo [2/3] 古いビルドキャッシュを削除中...
 if exist build   rmdir /s /q build
 if exist dist    rmdir /s /q dist
 
-REM --- icon.ico が存在する場合だけ --icon を付与 ---
+REM --- オプション: icon.ico ---
 set ICON_OPT=
 if exist icon.ico set ICON_OPT=--icon "icon.ico"
 
-REM --- app_config.json が存在する場合は同梱 ---
+REM --- オプション: app_config.json ---
 set CFG_OPT=
 if exist app_config.json set CFG_OPT=--add-data "app_config.json;."
 
-REM --- EXE ビルド ---
+REM ============================================================
+REM  [3/3] EXE ビルド
+REM ============================================================
+echo.
 echo [3/3] EXE をビルド中（数分かかります）...
-pyinstaller ^
+%PY% -m PyInstaller ^
     --noconfirm ^
     --onedir ^
     --windowed ^
@@ -114,6 +167,6 @@ echo    1. dist\HospitalSurvey\ フォルダごと各端末にコピー
 echo       （初回配布 / 手動アップデート）
 echo.
 echo    2. 自動アップデートで配布する場合は deploy_update.bat を実行
-echo       （共有フォルダの _app_update\ に EXE+version.txt を配置）
+echo       （共有フォルダの _app_update\ に EXE + version.txt を配置）
 echo ============================================================
 pause
