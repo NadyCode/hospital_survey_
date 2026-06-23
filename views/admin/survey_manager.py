@@ -3,7 +3,7 @@
 """
 import os
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import ttk, messagebox, simpledialog
 import uuid
 
 from config import get_surveys_dir, get_shared_folder
@@ -105,6 +105,21 @@ class SurveyManagerTab:
             return None
         return sel[0]
 
+    def _check_survey_password(self, survey: Survey) -> bool:
+        """パスワードが設定されている場合は入力を求める。OKなら True を返す。"""
+        if not survey.survey_password:
+            return True
+        pw = simpledialog.askstring(
+            "パスワード確認",
+            f"「{survey.title}」のパスワードを入力してください:",
+            show="*")
+        if pw is None:
+            return False
+        if pw != survey.survey_password:
+            messagebox.showerror("エラー", "パスワードが違います。")
+            return False
+        return True
+
     def _new_survey(self):
         sid = str(uuid.uuid4())[:8]
         survey = Survey(id=sid, title="新しいアンケート")
@@ -119,9 +134,12 @@ class SurveyManagerTab:
         fpath = os.path.join(get_surveys_dir(), fname)
         try:
             survey = Survey.load(fpath)
-            self._open_editor(survey, fpath)
         except Exception as e:
             messagebox.showerror("エラー", f"読み込みエラー: {e}")
+            return
+        if not self._check_survey_password(survey):
+            return
+        self._open_editor(survey, fpath)
 
     def _open_editor(self, survey: Survey, fpath: str):
         from views.admin.survey_editor import SurveyEditorWindow
@@ -140,6 +158,8 @@ class SurveyManagerTab:
             survey = Survey.load(fpath)
         except Exception as e:
             messagebox.showerror("エラー", str(e))
+            return
+        if not self._check_survey_password(survey):
             return
         from views.admin.aggregator import AggregatorWindow
         win = tk.Toplevel(self.parent)

@@ -107,8 +107,14 @@ class Survey:
     title: str
     description: str = ""
     is_test_mode: bool = False
-    is_anonymous: bool = False         # 匿名アンケート（部署・氏名を収集しない）
-    is_archived: bool = False          # アーカイブ（回答者一覧で非表示にする）
+    is_anonymous: bool = False          # 完全匿名（部署・氏名を収集しない）
+    anonymous_name_only: bool = False   # 部署のみ匿名（部署は保存、氏名は「匿名」として保存）
+    is_archived: bool = False           # アーカイブ（回答者一覧で非表示にする）
+    # 期限設定
+    start_date: str = ""                # 回答開始日 YYYY-MM-DD（空=制限なし）
+    end_date: str = ""                  # 回答終了日 YYYY-MM-DD（空=制限なし）
+    # アンケートパスワード（編集・集計時に要求）
+    survey_password: str = ""
     pass_score: int = 60           # 合格点（%）
     show_correct_after: bool = True  # 終了後に正解を表示するか
     allow_multiple_answers: bool = False  # 同一ユーザーの複数回答を許可
@@ -129,7 +135,11 @@ class Survey:
             "description": self.description,
             "is_test_mode": self.is_test_mode,
             "is_anonymous": self.is_anonymous,
+            "anonymous_name_only": self.anonymous_name_only,
             "is_archived": self.is_archived,
+            "start_date": self.start_date,
+            "end_date": self.end_date,
+            "survey_password": self.survey_password,
             "pass_score": self.pass_score,
             "show_correct_after": self.show_correct_after,
             "allow_multiple_answers": self.allow_multiple_answers,
@@ -147,7 +157,11 @@ class Survey:
             description=d.get("description", ""),
             is_test_mode=d.get("is_test_mode", False),
             is_anonymous=d.get("is_anonymous", False),
+            anonymous_name_only=d.get("anonymous_name_only", False),
             is_archived=d.get("is_archived", False),
+            start_date=d.get("start_date", ""),
+            end_date=d.get("end_date", ""),
+            survey_password=d.get("survey_password", ""),
             pass_score=d.get("pass_score", 60),
             show_correct_after=d.get("show_correct_after", True),
             allow_multiple_answers=d.get("allow_multiple_answers", False),

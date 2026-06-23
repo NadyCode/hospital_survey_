@@ -389,6 +389,23 @@ class AggregatorContent:
         tk.Button(toolbar, text="🔄 更新", font=FONT_NORMAL, relief="flat",
                   padx=10, pady=4, command=lambda: self._refresh_missing(tree)).pack(side="right")
 
+        # フィルタバー
+        filter_bar = tk.Frame(parent, bg=BG, pady=4)
+        filter_bar.pack(fill="x", padx=12)
+        tk.Label(filter_bar, text="部署:", font=FONT_NORMAL, bg=BG).pack(side="left")
+        all_users = load_master_users(get_data_path(MASTER_USER_FILE))
+        all_depts = sorted(set(u.department for u in all_users))
+        self._missing_dept_var = tk.StringVar(value="全部署")
+        dept_cb = ttk.Combobox(filter_bar, textvariable=self._missing_dept_var,
+                               values=["全部署"] + all_depts,
+                               state="readonly", font=FONT_NORMAL, width=18)
+        dept_cb.pack(side="left", padx=6)
+        self._missing_only_var = tk.BooleanVar(value=False)
+        tk.Checkbutton(filter_bar, text="未回答者のみ", variable=self._missing_only_var,
+                       font=FONT_NORMAL, bg=BG).pack(side="left", padx=12)
+        tk.Button(filter_bar, text="絞り込み", font=FONT_NORMAL, relief="flat",
+                  padx=8, pady=3, command=lambda: self._refresh_missing(tree)).pack(side="left", padx=4)
+
         frame = tk.Frame(parent)
         frame.pack(fill="both", expand=True, padx=12, pady=(0, 8))
 
@@ -412,9 +429,20 @@ class AggregatorContent:
         users = load_master_users(get_data_path(MASTER_USER_FILE))
         answered = {(r["部署"], r["氏名"]): r["回答日時"]
                     for r in get_answered_users(get_shared_folder(), self.survey.id)}
+
+        dept_filter = getattr(self, "_missing_dept_var", None)
+        dept_filter = dept_filter.get() if dept_filter else "全部署"
+        missing_only = getattr(self, "_missing_only_var", None)
+        missing_only = missing_only.get() if missing_only else False
+
         for u in users:
+            if dept_filter != "全部署" and u.department != dept_filter:
+                continue
             key = (u.department, u.name)
-            if key in answered:
+            is_answered = key in answered
+            if missing_only and is_answered:
+                continue
+            if is_answered:
                 tree.insert("", "end", values=(u.department, u.name, "✔ 回答済", answered[key]),
                             tags=("answered",))
             else:

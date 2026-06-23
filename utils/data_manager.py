@@ -15,6 +15,23 @@ def _answers_file(shared_folder: str, survey_id: str) -> str:
     return os.path.join(shared_folder, f"answers_{survey_id}.csv")
 
 
+def _backup_answers_file(filepath: str):
+    """回答CSVを日付付きで backups/ サブフォルダにバックアップする"""
+    if not os.path.exists(filepath):
+        return
+    try:
+        import shutil
+        backup_dir = os.path.join(os.path.dirname(filepath), "backups")
+        os.makedirs(backup_dir, exist_ok=True)
+        date_str = datetime.datetime.now().strftime("%Y%m%d")
+        base = os.path.basename(filepath)
+        name, ext = os.path.splitext(base)
+        dest = os.path.join(backup_dir, f"{name}_backup_{date_str}{ext}")
+        shutil.copy2(filepath, dest)
+    except Exception:
+        pass
+
+
 def save_answer(shared_folder: str, survey_id: str, department: str, name: str,
                 hostname: str, ip: str, answers: Dict[str, str]):
     """
@@ -27,6 +44,11 @@ def save_answer(shared_folder: str, survey_id: str, department: str, name: str,
 
     with file_lock(filepath):
         file_exists = os.path.exists(filepath)
+
+        # 保存前にバックアップ（ファイルが存在する場合のみ）
+        if file_exists:
+            _backup_answers_file(filepath)
+
         existing_q_ids = []
         if file_exists:
             with open(filepath, "r", encoding="utf-8-sig", newline="") as f:

@@ -8,6 +8,10 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 from typing import Dict, List, Optional
 
+# ラジオボタン初期「未選択」状態のセンチネル値
+# tkinter のデフォルト tristatevalue="" と衝突しないよう固有文字列を使用
+_UNSELECTED = "\x00__unselected__\x00"
+
 from config import (get_surveys_dir, get_shared_folder, get_data_path,
                     MASTER_USER_FILE, ACCESS_LOG_FILE)
 from models.survey import Survey, Question, QUESTION_TYPES
@@ -78,6 +82,8 @@ class SurveyListWindow:
                     mode = "テスト"
                 elif s.is_anonymous:
                     mode = "匿名"
+                elif s.anonymous_name_only:
+                    mode = "部署匿名"
                 else:
                     mode = "通常"
                 self.tree.insert("", "end", iid=fname,
@@ -95,6 +101,29 @@ class SurveyListWindow:
         survey = self.survey_map.get(fname)
         if not survey:
             return
+
+        # 期限チェック
+        import datetime
+        today = datetime.date.today()
+        if survey.start_date:
+            try:
+                start = datetime.date.fromisoformat(survey.start_date)
+                if today < start:
+                    messagebox.showwarning("回答期間外",
+                        f"このアンケートは {survey.start_date} から回答できます。")
+                    return
+            except ValueError:
+                pass
+        if survey.end_date:
+            try:
+                end = datetime.date.fromisoformat(survey.end_date)
+                if today > end:
+                    messagebox.showwarning("回答期間終了",
+                        f"このアンケートの回答期間は {survey.end_date} で終了しました。")
+                    return
+            except ValueError:
+                pass
+
         win = tk.Toplevel(self.root)
         SurveyFormWindow(win, survey)
 
@@ -125,7 +154,10 @@ class SurveyFormWindow:
         tk.Label(hdr, text=f"📝 {self.survey.title}", font=FONT_LARGE,
                  bg=PRIMARY, fg="white").pack(side="left", padx=16, pady=10)
         if self.survey.is_anonymous:
-            tk.Label(hdr, text="匿名", font=FONT_NORMAL,
+            tk.Label(hdr, text="完全匿名", font=FONT_NORMAL,
+                     bg="#F57F17", fg="white", padx=8, pady=3).pack(side="left", padx=4)
+        elif self.survey.anonymous_name_only:
+            tk.Label(hdr, text="部署のみ匿名", font=FONT_NORMAL,
                      bg="#F57F17", fg="white", padx=8, pady=3).pack(side="left", padx=4)
         if self.survey.is_test_mode:
             pts = self.survey.total_points
@@ -135,40 +167,49 @@ class SurveyFormWindow:
     def _build_name_selector(self):
         """部署・氏名選択エリア（匿名アンケートまたは name_selector 設問がある場合はスキップ）"""
         if self.survey.is_anonymous:
-            return  # 匿名アンケートは部署・氏名を収集しない
+            return  # 完全匿名: 部署・氏名を収集しない
 
         has_ns = any(q.type == "name_selector" for q in self.survey.questions)
         if has_ns:
             return  # フォーム内の設問として処理
 
-        ns_frame = tk.Frame(self.root, bg="#E3F2FD", relief="flat", pady=8)
+        bg = "#E3F2FD"
+        ns_frame = tk.Frame(self.root, bg=bg, relief="flat", pady=8)
         ns_frame.pack(fill="x", padx=0)
-
-        inner = tk.Frame(ns_frame, bg="#E3F2FD")
+        inner = tk.Frame(ns_frame, bg=bg)
         inner.pack(padx=16)
 
-        tk.Label(inner, text="部署:", font=FONT_NORMAL, bg="#E3F2FD").pack(side="left")
+        tk.Label(inner, text="部署:", font=FONT_NORMAL, bg=bg).pack(side="left")
         depts = get_departments(self._users)
         self._dept_var = tk.StringVar()
         dept_cb = ttk.Combobox(inner, textvariable=self._dept_var, values=depts,
                                state="readonly", font=FONT_NORMAL, width=16)
         dept_cb.pack(side="left", padx=6)
 
-        tk.Label(inner, text="氏名:", font=FONT_NORMAL, bg="#E3F2FD").pack(side="left", padx=(12, 0))
-        self._name_var = tk.StringVar()
-        self._name_cb = ttk.Combobox(inner, textvariable=self._name_var,
-                                     state="readonly", font=FONT_NORMAL, width=16)
-        self._name_cb.pack(side="left", padx=6)
+        if not self.survey.anonymous_name_only:
+            # 通常モード: 氏名も選択
+            tk.Label(inner, text="氏名:", font=FONT_NORMAL, bg=bg).pack(side="left", padx=(12, 0))
+            self._name_var = tk.StringVar()
+            self._name_cb = ttk.Combobox(inner, textvariable=self._name_var,
+                                         state="readonly", font=FONT_NORMAL, width=16)
+            self._name_cb.pack(side="left", padx=6)
+            dept_cb.bind("<<ComboboxSelected>>", self._on_dept_change)
+        else:
+            # 部署のみ匿名モード: 氏名は収集しない
+            tk.Label(inner, text="（氏名は記録されません）", font=FONT_SMALL,
+                     bg=bg, fg="#0288D1").pack(side="left", padx=8)
+            self._name_var = tk.StringVar(value="匿名")
+            self._name_cb = None
 
-        dept_cb.bind("<<ComboboxSelected>>", self._on_dept_change)
         self._top_dept_var = self._dept_var
         self._top_name_var = self._name_var
 
     def _on_dept_change(self, event):
         dept = self._dept_var.get()
-        names = get_names_for_department(self._users, dept)
-        self._name_cb["values"] = names
-        self._name_var.set("")
+        if self._name_cb is not None:
+            names = get_names_for_department(self._users, dept)
+            self._name_cb["values"] = names
+            self._name_var.set("")
 
     def _build_form(self):
         # スクロール可能フォームエリア
@@ -259,7 +300,7 @@ class SurveyFormWindow:
         self._widget_map[q.id] = widget_info
 
     def _render_radio(self, parent, q: Question, info: dict):
-        var = tk.StringVar()
+        var = tk.StringVar(value=_UNSELECTED)
         opts_frame = tk.Frame(parent, bg=CARD_BG)
         opts_frame.pack(fill="x", padx=24, pady=(0, 10))
         for opt in q.options:
@@ -311,7 +352,7 @@ class SurveyFormWindow:
         info["widget"] = text_widget
 
     def _render_scale(self, parent, q: Question, info: dict):
-        var = tk.IntVar(value=0)
+        var = tk.IntVar(value=-99999)  # -99999 = 未選択センチネル（tristatevalue と一致）
         opts_frame = tk.Frame(parent, bg=CARD_BG)
         opts_frame.pack(fill="x", padx=24, pady=(0, 10))
 
@@ -379,7 +420,8 @@ class SurveyFormWindow:
         info = self._widget_map.get(q.id, {})
         qtype = q.type
         if qtype in ("radio", "dropdown"):
-            return info.get("var", tk.StringVar()).get()
+            v = info.get("var", tk.StringVar()).get()
+            return "" if v == _UNSELECTED else v
         elif qtype == "checkbox":
             selected = [opt for opt, v in info.get("vars", []) if v.get()]
             return "|||".join(selected)
@@ -390,7 +432,7 @@ class SurveyFormWindow:
             return w.get("1.0", "end").strip() if w else ""
         elif qtype == "scale":
             v = info.get("var", tk.IntVar()).get()
-            return str(v) if v != 0 else ""
+            return str(v) if v != -99999 else ""
         elif qtype == "name_selector":
             dept = info.get("dept_var", tk.StringVar()).get()
             name = info.get("name_var", tk.StringVar()).get()
@@ -489,9 +531,24 @@ class SurveyFormWindow:
 
         # 部署・氏名を取得
         if self.survey.is_anonymous:
-            # 匿名アンケート: 識別情報は保存しない
+            # 完全匿名: 識別情報は保存しない
             self.department = ""
             self.name = "匿名"
+        elif self.survey.anonymous_name_only:
+            # 部署のみ匿名: 部署だけ収集、氏名は「匿名」として保存
+            has_ns = any(q.type == "name_selector" for q in self.survey.questions)
+            if not has_ns:
+                dept = self._top_dept_var.get() if hasattr(self, "_top_dept_var") else ""
+                if not dept:
+                    messagebox.showwarning("入力エラー", "部署を選択してください")
+                    return
+                self.department = dept
+                self.name = "匿名"
+            else:
+                if not self.department:
+                    messagebox.showwarning("入力エラー", "部署を選択してください")
+                    return
+                self.name = "匿名"
         else:
             has_ns = any(q.type == "name_selector" for q in self.survey.questions)
             if not has_ns:
@@ -515,8 +572,9 @@ class SurveyFormWindow:
             messagebox.showwarning("入力エラー", msg)
             return
 
-        # 重複チェック（匿名アンケートはスキップ）
-        if not self.survey.is_anonymous and not self.survey.allow_multiple_answers:
+        # 重複チェック（匿名系はスキップ）
+        skip_dup_check = self.survey.is_anonymous or self.survey.anonymous_name_only
+        if not skip_dup_check and not self.survey.allow_multiple_answers:
             if has_answered(get_shared_folder(), self.survey.id, self.department, self.name):
                 messagebox.showwarning("回答済み", "すでに回答済みです。")
                 return

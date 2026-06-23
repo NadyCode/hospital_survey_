@@ -78,23 +78,61 @@ class SurveyEditorWindow:
         tk.Checkbutton(self.test_frame, text="終了後に正解を表示", variable=self.show_correct_var,
                        font=FONT_NORMAL, bg=BG).pack(side="left", padx=8)
 
-        # 匿名アンケート
+        # 匿名アンケート（完全匿名）
         self.is_anon_var = tk.BooleanVar(value=self.survey.is_anonymous)
-        tk.Checkbutton(cfg_frame, text="匿名アンケート（部署・氏名を収集しない）",
+        tk.Checkbutton(cfg_frame, text="完全匿名（部署・氏名を収集しない）",
                        variable=self.is_anon_var, font=FONT_NORMAL, bg=BG,
                        command=self._toggle_anon_mode).grid(
                            row=4, column=0, columnspan=2, sticky="w", pady=3)
 
+        # 部署のみ匿名
+        self.anon_name_only_var = tk.BooleanVar(value=self.survey.anonymous_name_only)
+        tk.Checkbutton(cfg_frame, text="部署のみ匿名（部署は保存、氏名は「匿名」として保存）",
+                       variable=self.anon_name_only_var, font=FONT_NORMAL, bg=BG).grid(
+                           row=5, column=0, columnspan=2, sticky="w", pady=2)
+
         self.anon_note = tk.Label(cfg_frame,
-                                  text="  ※ 回答者は識別されません。重複回答チェックも行いません。",
+                                  text="  ※ 完全匿名時は回答者識別・重複チェックを行いません。",
                                   font=("Yu Gothic UI", 9), bg=BG, fg="#F57F17")
-        self.anon_note.grid(row=5, column=0, columnspan=2, sticky="w")
+        self.anon_note.grid(row=6, column=0, columnspan=2, sticky="w")
 
         self.multi_answer_var = tk.BooleanVar(value=self.survey.allow_multiple_answers)
         self.multi_answer_cb = tk.Checkbutton(cfg_frame, text="同一ユーザーの複数回答を許可",
                                               variable=self.multi_answer_var,
                                               font=FONT_NORMAL, bg=BG)
-        self.multi_answer_cb.grid(row=6, column=0, columnspan=2, sticky="w", pady=3)
+        self.multi_answer_cb.grid(row=7, column=0, columnspan=2, sticky="w", pady=3)
+
+        # 期限設定
+        tk.Label(cfg_frame, text="開始日:", font=FONT_NORMAL, bg=BG).grid(
+            row=8, column=0, sticky="w", pady=3)
+        date_row = tk.Frame(cfg_frame, bg=BG)
+        date_row.grid(row=8, column=1, sticky="ew", pady=3, padx=(6, 0))
+        self.start_date_var = tk.StringVar(value=self.survey.start_date)
+        tk.Entry(date_row, textvariable=self.start_date_var, font=FONT_NORMAL, width=12,
+                 relief="solid", bd=1).pack(side="left")
+        tk.Label(date_row, text=" YYYY-MM-DD（空=制限なし）", font=("Yu Gothic UI", 9),
+                 bg=BG, fg=MUTED).pack(side="left", padx=4)
+
+        tk.Label(cfg_frame, text="終了日:", font=FONT_NORMAL, bg=BG).grid(
+            row=9, column=0, sticky="w", pady=3)
+        date_row2 = tk.Frame(cfg_frame, bg=BG)
+        date_row2.grid(row=9, column=1, sticky="ew", pady=3, padx=(6, 0))
+        self.end_date_var = tk.StringVar(value=self.survey.end_date)
+        tk.Entry(date_row2, textvariable=self.end_date_var, font=FONT_NORMAL, width=12,
+                 relief="solid", bd=1).pack(side="left")
+        tk.Label(date_row2, text=" YYYY-MM-DD（空=制限なし）", font=("Yu Gothic UI", 9),
+                 bg=BG, fg=MUTED).pack(side="left", padx=4)
+
+        # アンケートパスワード
+        tk.Label(cfg_frame, text="編集/集計PW:", font=FONT_NORMAL, bg=BG).grid(
+            row=10, column=0, sticky="w", pady=3)
+        pw_row = tk.Frame(cfg_frame, bg=BG)
+        pw_row.grid(row=10, column=1, sticky="ew", pady=3, padx=(6, 0))
+        self.survey_pw_var = tk.StringVar(value=self.survey.survey_password)
+        tk.Entry(pw_row, textvariable=self.survey_pw_var, font=FONT_NORMAL, width=16,
+                 relief="solid", bd=1, show="*").pack(side="left")
+        tk.Label(pw_row, text=" 空=パスワードなし", font=("Yu Gothic UI", 9),
+                 bg=BG, fg=MUTED).pack(side="left", padx=4)
 
         cfg_frame.columnconfigure(1, weight=1)
         self._toggle_test_mode()
@@ -629,6 +667,10 @@ class SurveyEditorWindow:
         self.survey.description = self.desc_text.get("1.0", "end").strip()
         self.survey.is_test_mode = self.is_test_var.get()
         self.survey.is_anonymous = self.is_anon_var.get()
+        self.survey.anonymous_name_only = self.anon_name_only_var.get()
+        self.survey.start_date = self.start_date_var.get().strip()
+        self.survey.end_date = self.end_date_var.get().strip()
+        self.survey.survey_password = self.survey_pw_var.get()
         self.survey.completion_text = self._comp_text.get("1.0", "end").strip()
         self.survey.completion_image_path = self._comp_img_var.get().strip()
         self.survey.completion_pdf_path = self._comp_pdf_var.get().strip()
