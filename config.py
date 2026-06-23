@@ -60,6 +60,16 @@ ANSWERS_FILE = "answers.csv"
 ACCESS_LOG_FILE = "access_log.csv"
 SURVEYS_DIR = "surveys"
 
+# ───── 自動更新 ─────
+APP_VERSION = APP_CONFIG.get("app_version", "1.0.0")  # この実行ファイルのバージョン
+UPDATE_DIR_NAME = "_app_update"      # 共有フォルダ内の更新配置フォルダ
+UPDATE_VERSION_FILE = "version.txt"  # 最新バージョンを記載するファイル
+UPDATE_EXE_NAME = "HospitalSurvey.exe"  # 配布する実行ファイル名
+
+
+def get_update_dir() -> str:
+    return os.path.join(get_shared_folder(), UPDATE_DIR_NAME)
+
 
 def get_surveys_dir() -> str:
     d = os.path.join(get_shared_folder(), SURVEYS_DIR)

@@ -30,20 +30,36 @@ class SurveyManagerTab:
                   padx=10, pady=6, cursor="hand2", command=self._edit_selected).pack(side="left", padx=4)
         tk.Button(toolbar, text="📊 集計を見る", font=FONT_NORMAL, relief="flat",
                   padx=10, pady=6, cursor="hand2", command=self._view_results).pack(side="left", padx=4)
+        tk.Button(toolbar, text="📦 アーカイブ", font=FONT_NORMAL, relief="flat",
+                  padx=10, pady=6, cursor="hand2",
+                  command=lambda: self._set_archive(True)).pack(side="left", padx=4)
+        tk.Button(toolbar, text="📤 アーカイブ解除", font=FONT_NORMAL, relief="flat",
+                  padx=10, pady=6, cursor="hand2",
+                  command=lambda: self._set_archive(False)).pack(side="left", padx=4)
         tk.Button(toolbar, text="🗑️ 削除", font=FONT_NORMAL, bg=DANGER, fg="white",
                   relief="flat", padx=10, pady=6, cursor="hand2",
                   command=self._delete_selected).pack(side="left", padx=4)
         tk.Button(toolbar, text="🔄 更新", font=FONT_NORMAL, relief="flat",
                   padx=10, pady=6, cursor="hand2", command=self._load_surveys).pack(side="right")
 
+        # フィルター
+        filter_bar = tk.Frame(self.parent, bg=BG)
+        filter_bar.pack(fill="x", padx=16, pady=(0, 4))
+        self.show_archived_var = tk.BooleanVar(value=False)
+        tk.Checkbutton(filter_bar, text="アーカイブしたアンケートも表示する",
+                       variable=self.show_archived_var, font=FONT_NORMAL, bg=BG,
+                       command=self._load_surveys).pack(side="left")
+
         # ツリービュー
-        cols = ("タイトル", "設問数", "回答数", "テストモード", "ファイル名")
+        cols = ("タイトル", "設問数", "回答数", "種別", "状態", "ファイル名")
         self.tree = ttk.Treeview(self.parent, columns=cols, show="headings", height=18)
-        widths = [280, 70, 70, 100, 200]
+        widths = [260, 60, 60, 90, 90, 180]
         for col, w in zip(cols, widths):
             self.tree.heading(col, text=col)
-            self.tree.column(col, width=w, anchor="center" if w < 200 else "w")
+            self.tree.column(col, width=w, anchor="center" if w < 180 else "w")
         self.tree.column("タイトル", anchor="w")
+
+        self.tree.tag_configure("archived", foreground=MUTED, background="#F0F0F0")
 
         scroll = ttk.Scrollbar(self.parent, orient="vertical", command=self.tree.yview)
         self.tree.configure(yscrollcommand=scroll.set)
@@ -55,6 +71,7 @@ class SurveyManagerTab:
 
     def _load_surveys(self):
         self.tree.delete(*self.tree.get_children())
+        show_archived = self.show_archived_var.get()
         survey_dir = get_surveys_dir()
         for fname in sorted(os.listdir(survey_dir)):
             if not fname.endswith(".json"):
@@ -62,6 +79,8 @@ class SurveyManagerTab:
             fpath = os.path.join(survey_dir, fname)
             try:
                 s = Survey.load(fpath)
+                if s.is_archived and not show_archived:
+                    continue
                 answers = load_answers(get_shared_folder(), s.id)
                 if s.is_test_mode and s.is_anonymous:
                     mode = "匿名テスト"
@@ -71,8 +90,11 @@ class SurveyManagerTab:
                     mode = "匿名"
                 else:
                     mode = "通常"
-                self.tree.insert("", "end", iid=fname,
-                                 values=(s.title, len(s.questions), len(answers), mode, fname))
+                status = "アーカイブ" if s.is_archived else "アクティブ"
+                tags = ("archived",) if s.is_archived else ()
+                self.tree.insert("", "end", iid=fname, tags=tags,
+                                 values=(s.title, len(s.questions), len(answers),
+                                         mode, status, fname))
             except Exception:
                 pass
 
@@ -122,6 +144,26 @@ class SurveyManagerTab:
         from views.admin.aggregator import AggregatorWindow
         win = tk.Toplevel(self.parent)
         AggregatorWindow(win, survey)
+
+    def _set_archive(self, archived: bool):
+        fname = self._selected_fname()
+        if not fname:
+            return
+        fpath = os.path.join(get_surveys_dir(), fname)
+        try:
+            survey = Survey.load(fpath)
+            if survey.is_archived == archived:
+                state = "アーカイブ済み" if archived else "アクティブ"
+                messagebox.showinfo("情報", f"このアンケートはすでに{state}です。")
+                return
+            survey.is_archived = archived
+            survey.save(fpath)
+            action = "アーカイブしました（回答者一覧から非表示になります）" if archived \
+                else "アーカイブを解除しました（回答者一覧に再表示されます）"
+            self._load_surveys()
+            messagebox.showinfo("完了", f"「{survey.title}」を{action}。")
+        except Exception as e:
+            messagebox.showerror("エラー", str(e))
 
     def _delete_selected(self):
         fname = self._selected_fname()

@@ -4,9 +4,9 @@
 import tkinter as tk
 from tkinter import ttk
 
-from config import get_data_path, ACCESS_LOG_FILE
-from utils.logger import read_access_logs
-from views.styles import BG, PRIMARY, FONT_NORMAL, FONT_H2, MUTED
+from config import get_data_path, get_shared_folder, ACCESS_LOG_FILE
+from utils.logger import read_access_logs, get_hostname, get_ip_address
+from views.styles import BG, PRIMARY, FONT_NORMAL, FONT_SMALL, FONT_H2, MUTED
 
 
 class AccessLogTab:
@@ -21,6 +21,16 @@ class AccessLogTab:
         tk.Label(toolbar, text="端末アクセスログ", font=FONT_H2, bg=BG, fg=PRIMARY).pack(side="left")
         tk.Button(toolbar, text="🔄 更新", font=FONT_NORMAL, relief="flat",
                   padx=10, pady=4, command=self._load).pack(side="right")
+
+        # この端末の情報（管理者のみ閲覧可能）
+        sys_frame = tk.Frame(self.parent, bg="#ECEFF1")
+        sys_frame.pack(fill="x", padx=12, pady=(0, 6))
+        tk.Label(sys_frame,
+                 text=f"💻 この端末:  端末名 {get_hostname()}   |   "
+                      f"IP {get_ip_address()}   |   "
+                      f"データ保存先 {get_shared_folder()}",
+                 font=FONT_SMALL, bg="#ECEFF1", fg=MUTED, anchor="w").pack(
+                     fill="x", padx=10, pady=4)
 
         frame = tk.Frame(self.parent)
         frame.pack(fill="both", expand=True, padx=12, pady=(0, 8))

@@ -76,11 +76,10 @@ class MainWindow:
                   activebackground="#4A148C", relief="flat", padx=20, pady=8,
                   cursor="hand2", command=self._open_admin).pack(pady=(10, 24))
 
-        # フッター情報
+        # フッター（端末名・IP・保存先などの技術情報は一般画面に表示しない）
         info_frame = tk.Frame(main, bg=BG)
         info_frame.pack(fill="x", pady=(20, 0))
-        tk.Label(info_frame, text=f"端末: {get_hostname()}  |  IP: {get_ip_address()}  |  "
-                                   f"データ保存先: {get_shared_folder()}",
+        tk.Label(info_frame, text="ご利用の前にモードを選択してください",
                  font=("Yu Gothic UI", 9), bg=BG, fg=MUTED).pack()
 
     def _open_respondent(self):

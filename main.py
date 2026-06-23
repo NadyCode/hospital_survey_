@@ -68,8 +68,17 @@ def _ensure_single_instance():
 
 
 def main():
-    _ensure_single_instance()
     ensure_shared_folder()
+
+    # 共有フォルダに新しいバージョンがあれば更新して再起動（exe・Windows のみ）
+    try:
+        from utils.updater import check_and_apply_update
+        if check_and_apply_update():
+            sys.exit(0)
+    except Exception:
+        pass
+
+    _ensure_single_instance()
 
     root = tk.Tk()
     root.title(get_app_title())

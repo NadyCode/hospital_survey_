@@ -106,12 +106,58 @@ def get_answered_users(shared_folder: str, survey_id: str) -> List[Dict]:
     return [{"部署": k[0], "氏名": k[1], "回答日時": v} for k, v in seen.items()]
 
 
-def aggregate_answers(shared_folder: str, survey_id: str, questions) -> Dict:
+def get_answer_departments(shared_folder: str, survey_id: str) -> List[str]:
+    """回答データに含まれる部署の一覧を返す（空欄を除く）"""
+    answers = load_answers(shared_folder, survey_id)
+    seen = []
+    for row in answers:
+        d = row.get("部署", "")
+        if d and d not in seen:
+            seen.append(d)
+    return seen
+
+
+def department_response_rates(shared_folder: str, survey_id: str, master_users) -> Dict:
+    """
+    所属（部署）別の回答率を計算する。
+    戻り値: {部署名: {"answered": 回答済人数, "total": 在籍人数, "rate": 回答率%}}
+    master_users: List[StaffMember]
+    """
+    answered = get_answered_users(shared_folder, survey_id)
+    answered_by_dept: Dict[str, set] = {}
+    for r in answered:
+        dept = r.get("部署", "")
+        if not dept:
+            continue
+        answered_by_dept.setdefault(dept, set()).add(r.get("氏名", ""))
+
+    total_by_dept: Dict[str, int] = {}
+    for u in master_users:
+        total_by_dept[u.department] = total_by_dept.get(u.department, 0) + 1
+
+    result = {}
+    all_depts = list(total_by_dept.keys())
+    for d in answered_by_dept:
+        if d not in all_depts:
+            all_depts.append(d)
+    for d in all_depts:
+        ans = len(answered_by_dept.get(d, set()))
+        total = total_by_dept.get(d, ans)  # マスター未登録部署は回答数を母数とする
+        rate = (ans / total * 100) if total else 0.0
+        result[d] = {"answered": ans, "total": total, "rate": round(rate, 1)}
+    return result
+
+
+def aggregate_answers(shared_folder: str, survey_id: str, questions,
+                      department: Optional[str] = None) -> Dict:
     """
     回答データを集計する
+    department を指定すると、その所属の回答のみを集計対象にする。
     戻り値: {question_id: {"type": ..., "text": ..., "counts": {...} or "values": [...]}}
     """
     answers = load_answers(shared_folder, survey_id)
+    if department:
+        answers = [r for r in answers if r.get("部署", "") == department]
     result = {}
 
     for q in questions:

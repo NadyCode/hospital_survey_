@@ -18,6 +18,11 @@ from views.styles import (PRIMARY, BG, CARD_BG, FONT_LARGE, FONT_NORMAL, FONT_ME
                            FONT_H2, FONT_SMALL, MUTED, DANGER, SUCCESS, WARNING,
                            BORDER, TEXT, CORRECT, INCORRECT)
 
+# ラジオボタンの初期「全選択」表示を防ぐためのセンチネル。
+# tkinter は variable の値が tristatevalue（既定="")と一致すると全ボタンを
+# 選択状態に描画してしまうため、選択肢が取り得ない値を tristatevalue に指定する。
+_UNSELECTED = "\x00__unselected__\x00"
+
 
 class SurveyListWindow:
     """アンケート選択画面"""
@@ -65,6 +70,8 @@ class SurveyListWindow:
                 continue
             try:
                 s = Survey.load(os.path.join(survey_dir, fname))
+                if s.is_archived:
+                    continue  # アーカイブ済みは回答者一覧に表示しない
                 if s.is_test_mode and s.is_anonymous:
                     mode = "匿名テスト"
                 elif s.is_test_mode:
@@ -257,6 +264,7 @@ class SurveyFormWindow:
         opts_frame.pack(fill="x", padx=24, pady=(0, 10))
         for opt in q.options:
             rb = tk.Radiobutton(opts_frame, text=opt, variable=var, value=opt,
+                                tristatevalue=_UNSELECTED,
                                 font=FONT_NORMAL, bg=CARD_BG, activebackground=CARD_BG,
                                 command=lambda: self._on_answer_changed(q))
             rb.pack(anchor="w", pady=2)
@@ -318,6 +326,7 @@ class SurveyFormWindow:
             col_frame.pack(side="left", padx=8)
             tk.Label(col_frame, text=str(val), font=FONT_NORMAL, bg=CARD_BG).pack()
             rb = tk.Radiobutton(col_frame, variable=var, value=val, bg=CARD_BG,
+                                tristatevalue=-99999,
                                 activebackground=CARD_BG,
                                 command=lambda: self._on_answer_changed(q))
             rb.pack()

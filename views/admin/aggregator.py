@@ -9,7 +9,9 @@ from typing import Optional
 from config import get_surveys_dir, get_shared_folder, get_data_path, MASTER_USER_FILE
 from models.survey import Survey
 from models.user import load_master_users
-from utils.data_manager import aggregate_answers, load_answers, get_answered_users, export_answers_csv
+from utils.data_manager import (aggregate_answers, load_answers, get_answered_users,
+                                export_answers_csv, get_answer_departments,
+                                department_response_rates)
 from views.styles import (PRIMARY, BG, CARD_BG, FONT_LARGE, FONT_NORMAL, FONT_MEDIUM,
                            FONT_H2, MUTED, SUCCESS, DANGER, FONT_SMALL, BORDER, TEXT)
 
@@ -106,9 +108,13 @@ class AggregatorWindow:
 
 
 class AggregatorContent:
+    ALL_LABEL = "全体（すべての所属）"
+
     def __init__(self, parent: tk.Widget, survey: Survey):
         self.survey = survey
         self.parent = parent
+        self._dept_filter = None     # None = 全体
+        self._chart_figures = []
         self._build()
 
     def _build(self):
@@ -121,6 +127,21 @@ class AggregatorContent:
         tk.Button(tb, text="🖼️ グラフを画像保存", font=FONT_NORMAL, relief="flat",
                   padx=10, pady=4, command=self._export_charts).pack(side="right", padx=4)
 
+        # 所属（部署）フィルタ
+        filter_bar = tk.Frame(self.parent, bg="#E3F2FD")
+        filter_bar.pack(fill="x", padx=12, pady=(0, 4))
+        tk.Label(filter_bar, text="🔎 所属で絞り込み:", font=FONT_NORMAL, bg="#E3F2FD").pack(
+            side="left", padx=(8, 4), pady=6)
+        depts = self._available_departments()
+        self._dept_var = tk.StringVar(value=self.ALL_LABEL)
+        self._dept_combo = ttk.Combobox(filter_bar, textvariable=self._dept_var,
+                                        values=[self.ALL_LABEL] + depts,
+                                        state="readonly", font=FONT_NORMAL, width=24)
+        self._dept_combo.pack(side="left", pady=6)
+        self._dept_combo.bind("<<ComboboxSelected>>", lambda e: self._on_dept_filter_change())
+        tk.Label(filter_bar, text="（全体／所属別を切り替えて分析できます）",
+                 font=FONT_SMALL, bg="#E3F2FD", fg=MUTED).pack(side="left", padx=8)
+
         # タブ
         nb = ttk.Notebook(self.parent)
         nb.pack(fill="both", expand=True, padx=8, pady=(0, 8))
@@ -128,7 +149,10 @@ class AggregatorContent:
         # 集計・グラフタブ
         tab_agg = ttk.Frame(nb)
         nb.add(tab_agg, text="  📊 集計・グラフ  ")
-        self._build_aggregate_tab(tab_agg)
+        # 中身は再描画できるようコンテナに格納
+        self._agg_container = tk.Frame(tab_agg, bg=BG)
+        self._agg_container.pack(fill="both", expand=True)
+        self._render_aggregate()
 
         # 未回答者タブ
         tab_missing = ttk.Frame(nb)
@@ -140,12 +164,44 @@ class AggregatorContent:
         nb.add(tab_raw, text="  📋 回答一覧  ")
         self._build_raw_tab(tab_raw)
 
-    # ─────────────────── 集計・グラフ ───────────────────
-    def _build_aggregate_tab(self, parent: ttk.Frame):
-        agg = aggregate_answers(get_shared_folder(), self.survey.id, self.survey.questions)
+    # ─────────────────── 所属フィルタ ───────────────────
+    def _available_departments(self):
+        """マスター＋回答データに含まれる部署の一覧"""
+        depts = []
+        for u in load_master_users(get_data_path(MASTER_USER_FILE)):
+            if u.department not in depts:
+                depts.append(u.department)
+        for d in get_answer_departments(get_shared_folder(), self.survey.id):
+            if d not in depts:
+                depts.append(d)
+        return depts
 
-        if not agg:
-            tk.Label(parent, text="回答データがありません", font=FONT_LARGE, bg=BG, fg=MUTED).pack(expand=True)
+    def _on_dept_filter_change(self):
+        sel = self._dept_var.get()
+        self._dept_filter = None if sel == self.ALL_LABEL else sel
+        self._render_aggregate()
+
+    # ─────────────────── 集計・グラフ ───────────────────
+    def _render_aggregate(self):
+        # コンテナをクリアして再描画
+        for w in self._agg_container.winfo_children():
+            w.destroy()
+        parent = self._agg_container
+
+        agg = aggregate_answers(get_shared_folder(), self.survey.id,
+                                self.survey.questions, department=self._dept_filter)
+
+        # 絞り込み状態の見出し
+        scope = "全体" if self._dept_filter is None else f"所属「{self._dept_filter}」"
+        head = tk.Frame(parent, bg=BG)
+        head.pack(fill="x")
+        tk.Label(head, text=f"集計対象: {scope}", font=FONT_NORMAL, bg=BG,
+                 fg=PRIMARY).pack(anchor="w", padx=12, pady=(6, 0))
+
+        has_data = any(agg.get(q.id, {}).get("total", 0) > 0 for q in self.survey.questions)
+        if not has_data:
+            tk.Label(parent, text="該当する回答データがありません",
+                     font=FONT_LARGE, bg=BG, fg=MUTED).pack(expand=True)
             return
 
         # スクロール
@@ -184,7 +240,15 @@ class AggregatorContent:
             tk.Label(card, text=f"回答数: {total} 件", font=FONT_SMALL, bg=CARD_BG, fg=MUTED).pack(
                 anchor="w", padx=12)
 
-            if qtype in ("radio", "checkbox", "dropdown", "scale", "name_selector"):
+            if qtype == "name_selector":
+                # 部署・氏名を聞く設問は「所属別 回答率」を表示する
+                tk.Label(card, text="所属別 回答率", font=FONT_NORMAL, bg=CARD_BG,
+                         fg="#00695C").pack(anchor="w", padx=12, pady=(2, 0))
+                rate_frame = tk.Frame(card, bg=CARD_BG)
+                rate_frame.pack(fill="x", padx=12, pady=8)
+                self._draw_rate_section(rate_frame)
+
+            elif qtype in ("radio", "checkbox", "dropdown", "scale"):
                 counts = data.get("counts", {})
                 chart_frame = tk.Frame(card, bg=CARD_BG)
                 chart_frame.pack(fill="x", padx=12, pady=8)
@@ -266,6 +330,56 @@ class AggregatorContent:
         chart_canvas = FigureCanvasTkAgg(fig, master=parent)
         chart_canvas.draw()
         chart_canvas.get_tk_widget().pack(fill="x")
+
+    def _draw_rate_section(self, parent: tk.Frame):
+        """所属別の回答率を描画する（②）"""
+        master = load_master_users(get_data_path(MASTER_USER_FILE))
+        rates = department_response_rates(get_shared_folder(), self.survey.id, master)
+
+        # 所属フィルタ中はその部署のみ表示
+        if self._dept_filter:
+            rates = {d: v for d, v in rates.items() if d == self._dept_filter}
+
+        if not rates:
+            tk.Label(parent, text="職員マスターまたは回答データがありません。",
+                     font=FONT_NORMAL, bg=CARD_BG, fg=MUTED).pack(anchor="w")
+            return
+
+        depts = sorted(rates.keys())
+
+        if MATPLOTLIB_AVAILABLE:
+            fig = Figure(figsize=(8, max(2.2, 0.5 * len(depts) + 1.2)), dpi=90, facecolor=CARD_BG)
+            self._chart_figures.append(fig)
+            ax = fig.add_subplot(1, 1, 1)
+            values = [rates[d]["rate"] for d in depts]
+            colors = [COLORS[i % len(COLORS)] for i in range(len(depts))]
+            bars = ax.barh(depts, values, color=colors, edgecolor="white")
+            ax.set_xlim(0, 100)
+            ax.set_xlabel("回答率 (%)", fontsize=9)
+            ax.set_title("所属別 回答率", fontsize=10)
+            ax.tick_params(labelsize=9)
+            for bar, d in zip(bars, depts):
+                info = rates[d]
+                ax.text(bar.get_width() + 1, bar.get_y() + bar.get_height() / 2,
+                        f" {info['rate']:.1f}%  ({info['answered']}/{info['total']}名)",
+                        va="center", fontsize=8)
+            ax.set_facecolor(CARD_BG)
+            fig.tight_layout(pad=1.2)
+            cv = FigureCanvasTkAgg(fig, master=parent)
+            cv.draw()
+            cv.get_tk_widget().pack(fill="x")
+        else:
+            for d in depts:
+                info = rates[d]
+                row = tk.Frame(parent, bg=CARD_BG)
+                row.pack(fill="x", pady=1)
+                tk.Label(row, text=d, font=FONT_NORMAL, bg=CARD_BG, width=18, anchor="w").pack(side="left")
+                bar_frame = tk.Frame(row, bg="#ECEFF1", height=18)
+                bar_frame.pack(side="left", fill="x", expand=True, padx=4)
+                fill = tk.Frame(bar_frame, bg=SUCCESS, width=max(2, int(info["rate"] * 2)), height=18)
+                fill.place(x=0, y=0)
+                tk.Label(row, text=f"{info['rate']:.1f}% ({info['answered']}/{info['total']}名)",
+                         font=FONT_SMALL, bg=CARD_BG, width=18).pack(side="left")
 
     # ─────────────────── 回答状況 ───────────────────
     def _build_missing_tab(self, parent: ttk.Frame):
