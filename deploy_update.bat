@@ -1,116 +1,117 @@
 @echo off
-REM ====================================================
-REM 病院アンケートシステム - 自動更新配布スクリプト
+REM ============================================================
+REM Hospital Survey System - Auto-Update Deploy Script
 REM
-REM ビルド後に実行すると、共有フォルダの _app_update\ に
-REM 最新 EXE と version.txt を配置します。
-REM 次回各端末の起動時に自動更新が適用されます。
+REM Copies the built EXE and version.txt to the shared folder's
+REM _app_update\ subfolder so clients auto-update on next launch.
 REM
-REM 使い方:
+REM Usage:
 REM   deploy_update.bat
-REM     -> app_config.json の shared_folder を自動検出
+REM     (reads shared_folder path from app_config.json)
 REM
 REM   deploy_update.bat "\\server\share\HospitalData"
-REM     -> 共有フォルダのパスを直接指定
-REM ====================================================
+REM     (specify shared folder path directly)
+REM ============================================================
 chcp 65001 > nul
+setlocal enableextensions
 
-REM --- BAT ファイルと同じフォルダに移動 ---
+REM Move to the folder where this bat file lives
 cd /d "%~dp0"
 
 echo ============================================================
-echo  病院アンケートシステム  自動更新配布
+echo  Hospital Survey System - Deploy Update
 echo ============================================================
 
 REM ============================================================
-REM  Python コマンドの自動検出
+REM  Detect Python
 REM ============================================================
 set PY=
-python --version >nul 2>&1
+
+python -c "import sys" >nul 2>&1
 if %ERRORLEVEL% equ 0 (
     set PY=python
     goto :py_found
 )
-py --version >nul 2>&1
+
+py -c "import sys" >nul 2>&1
 if %ERRORLEVEL% equ 0 (
     set PY=py
     goto :py_found
 )
-echo [ERROR] Python が見つかりません。build.bat を先に実行し、Python をインストールしてください。
+
+echo [ERROR] Python not found. Run build.bat first and install Python.
 pause
 exit /b 1
 :py_found
 
 REM ============================================================
-REM  ビルド成果物の確認
+REM  Check build artifacts
 REM ============================================================
 if not exist "dist\HospitalSurvey\HospitalSurvey.exe" (
-    echo [ERROR] dist\HospitalSurvey\HospitalSurvey.exe が見つかりません。
-    echo         先に build.bat を実行してください。
+    echo [ERROR] dist\HospitalSurvey\HospitalSurvey.exe not found.
+    echo         Run build.bat first.
     pause
     exit /b 1
 )
 if not exist "dist\HospitalSurvey\version.txt" (
-    echo [ERROR] dist\HospitalSurvey\version.txt が見つかりません。
-    echo         先に build.bat を実行してください。
+    echo [ERROR] dist\HospitalSurvey\version.txt not found.
+    echo         Run build.bat first.
     pause
     exit /b 1
 )
 
-REM --- バージョン確認 ---
 set /p NEW_VERSION=<"dist\HospitalSurvey\version.txt"
-echo [VER] 配布するバージョン: %NEW_VERSION%
+echo [VER] Deploying version: %NEW_VERSION%
 
 REM ============================================================
-REM  共有フォルダの特定
+REM  Resolve shared folder path
 REM ============================================================
 if not "%~1"=="" (
     set SHARED=%~1
-    echo [DIR] 共有フォルダ（引数指定）: %SHARED%
+    echo [DIR] Shared folder (argument): %SHARED%
 ) else (
     for /f "delims=" %%S in ('%PY% _update_version.py --shared-folder') do set SHARED=%%S
-    echo [DIR] 共有フォルダ: %SHARED%
+    echo [DIR] Shared folder (app_config.json): %SHARED%
 )
 
 REM ============================================================
-REM  _app_update フォルダへ配置
+REM  Copy files to _app_update\
 REM ============================================================
 set UPDATE_DIR=%SHARED%\_app_update
 if not exist "%UPDATE_DIR%" (
     mkdir "%UPDATE_DIR%"
     if %ERRORLEVEL% neq 0 (
-        echo [ERROR] %UPDATE_DIR% を作成できませんでした。
-        echo         フォルダのパスとアクセス権を確認してください。
+        echo [ERROR] Cannot create %UPDATE_DIR%
+        echo         Check the path and write permissions.
         pause
         exit /b 1
     )
-    echo [DIR] %UPDATE_DIR% を作成しました。
+    echo [DIR] Created %UPDATE_DIR%
 )
 
-echo [COPY] HospitalSurvey.exe をコピー中...
+echo [COPY] Copying HospitalSurvey.exe...
 copy /Y "dist\HospitalSurvey\HospitalSurvey.exe" "%UPDATE_DIR%\HospitalSurvey.exe"
 if %ERRORLEVEL% neq 0 (
-    echo [ERROR] EXE のコピーに失敗しました。
-    echo         共有フォルダへの書き込み権限を確認してください。
+    echo [ERROR] Failed to copy EXE. Check write permissions.
     pause
     exit /b 1
 )
 
-echo [COPY] version.txt をコピー中...
+echo [COPY] Copying version.txt...
 copy /Y "dist\HospitalSurvey\version.txt" "%UPDATE_DIR%\version.txt"
 if %ERRORLEVEL% neq 0 (
-    echo [ERROR] version.txt のコピーに失敗しました。
+    echo [ERROR] Failed to copy version.txt.
     pause
     exit /b 1
 )
 
 echo.
 echo ============================================================
-echo  配布完了！  バージョン: %NEW_VERSION%
+echo  Deploy complete!  Version: %NEW_VERSION%
 echo.
-echo  配置先: %UPDATE_DIR%
+echo  Destination: %UPDATE_DIR%
 echo.
-echo  各端末が次回起動時に自動更新ダイアログを表示し、
-echo  承認後に新しい EXE が適用されます。
+echo  Clients will see an update dialog on next launch.
 echo ============================================================
 pause
+endlocal
