@@ -316,7 +316,7 @@ class SurveyFormWindow:
         opts_frame = tk.Frame(parent, bg=CARD_BG)
         opts_frame.pack(fill="x", padx=24, pady=(0, 10))
         for opt in q.options:
-            v = tk.BooleanVar()
+            v = tk.BooleanVar(value=False)
             cb = tk.Checkbutton(opts_frame, text=opt, variable=v,
                                 font=FONT_NORMAL, bg=CARD_BG, activebackground=CARD_BG,
                                 command=lambda: self._on_answer_changed(q))
