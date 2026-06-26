@@ -8,10 +8,6 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 from typing import Dict, List, Optional
 
-# ラジオボタン初期「未選択」状態のセンチネル値
-# tkinter のデフォルト tristatevalue="" と衝突しないよう固有文字列を使用
-_UNSELECTED = "\x00__unselected__\x00"
-
 from config import (get_surveys_dir, get_shared_folder, get_data_path,
                     MASTER_USER_FILE, ACCESS_LOG_FILE)
 from models.survey import Survey, Question, QUESTION_TYPES
@@ -22,9 +18,9 @@ from views.styles import (PRIMARY, BG, CARD_BG, FONT_LARGE, FONT_NORMAL, FONT_ME
                            FONT_H2, FONT_SMALL, MUTED, DANGER, SUCCESS, WARNING,
                            BORDER, TEXT, CORRECT, INCORRECT)
 
-# ラジオボタンの初期「全選択」表示を防ぐためのセンチネル。
-# tkinter は variable の値が tristatevalue（既定="")と一致すると全ボタンを
-# 選択状態に描画してしまうため、選択肢が取り得ない値を tristatevalue に指定する。
+# ラジオボタン未選択センチネル。
+# StringVar(value=_UNSELECTED) にしておくことでどの選択肢にも一致せず未選択状態になる。
+# tristatevalue はデフォルト "" のままにする（_UNSELECTED != "" のためトリステートにならない）。
 _UNSELECTED = "\x00__unselected__\x00"
 
 
@@ -305,7 +301,6 @@ class SurveyFormWindow:
         opts_frame.pack(fill="x", padx=24, pady=(0, 10))
         for opt in q.options:
             rb = tk.Radiobutton(opts_frame, text=opt, variable=var, value=opt,
-                                tristatevalue=_UNSELECTED,
                                 font=FONT_NORMAL, bg=CARD_BG, activebackground=CARD_BG,
                                 command=lambda: self._on_answer_changed(q))
             rb.pack(anchor="w", pady=2)
@@ -367,7 +362,6 @@ class SurveyFormWindow:
             col_frame.pack(side="left", padx=8)
             tk.Label(col_frame, text=str(val), font=FONT_NORMAL, bg=CARD_BG).pack()
             rb = tk.Radiobutton(col_frame, variable=var, value=val, bg=CARD_BG,
-                                tristatevalue=-99999,
                                 activebackground=CARD_BG,
                                 command=lambda: self._on_answer_changed(q))
             rb.pack()
