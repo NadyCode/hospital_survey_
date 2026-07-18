@@ -14,7 +14,7 @@ from config import (get_surveys_dir, get_shared_folder, get_data_path,
                     MASTER_USER_FILE, ACCESS_LOG_FILE)
 from models.survey import Survey, Question, QUESTION_TYPES
 from models.user import (load_master_users, get_departments, get_names_for_department,
-                         update_master_user, add_master_user)
+                         update_master_user)
 from utils.data_manager import save_answer, has_answered
 from utils.logger import get_hostname, get_ip_address, write_access_log
 from views.styles import (PRIMARY, BG, CARD_BG, FONT_LARGE, FONT_NORMAL, FONT_MEDIUM,
@@ -28,10 +28,10 @@ _UNSELECTED = "\x00__unselected__\x00"
 
 
 class StaffEditDialog(tk.Toplevel):
-    """職員マスターの登録情報を編集・新規作成するモーダルダイアログ。
+    """職員マスターの登録情報を修正するモーダルダイアログ。
 
     OK を押すと self.result = (部署, 氏名) がセットされる。キャンセル時は None。
-    氏名は「姓」「名」の2つの入力欄を半角スペースで連結して保持する。
+    氏名は「姓」「名」の2つの入力欄を全角スペースで連結して保持する。
     """
     def __init__(self, parent, departments, title="登録情報", dept="", name=""):
         super().__init__(parent)
@@ -98,7 +98,7 @@ class StaffEditDialog(tk.Toplevel):
         if not sei:
             messagebox.showwarning("入力エラー", "姓を入力してください", parent=self)
             return
-        full = f"{sei} {mei}".strip() if mei else sei
+        full = f"{sei}　{mei}" if mei else sei
         self.result = (dept, full)
         self.destroy()
 
@@ -279,9 +279,6 @@ class SurveyFormWindow:
             tk.Button(inner, text="✏️ 登録情報の修正", font=FONT_SMALL, relief="flat",
                       padx=6, pady=2, cursor="hand2",
                       command=self._edit_my_staff).pack(side="left", padx=(12, 2))
-            tk.Button(inner, text="＋ 新規作成", font=FONT_SMALL, relief="flat",
-                      bg=SUCCESS, fg="white", padx=6, pady=2, cursor="hand2",
-                      command=self._new_my_staff).pack(side="left", padx=2)
         else:
             # 部署のみ匿名モード: 氏名は収集しない
             tk.Label(inner, text="（氏名は記録されません）", font=FONT_SMALL,
@@ -336,23 +333,6 @@ class SurveyFormWindow:
         self._reload_master()
         self._refresh_top_selector(new_dept, new_name)
         messagebox.showinfo("完了", "登録情報を修正しました。")
-
-    def _new_my_staff(self):
-        res = self._open_staff_dialog(self._dept_var.get(), "", "新規登録")
-        if not res:
-            return
-        new_dept, new_name = res
-        try:
-            created = add_master_user(get_data_path(MASTER_USER_FILE), new_dept, new_name)
-        except Exception as e:
-            messagebox.showerror("保存エラー", f"職員マスターの登録に失敗しました:\n{e}")
-            return
-        self._reload_master()
-        self._refresh_top_selector(new_dept, new_name)
-        if created:
-            messagebox.showinfo("完了", f"{new_name}（{new_dept}）を登録しました。")
-        else:
-            messagebox.showinfo("登録済み", "この職員は既に登録されています。")
 
     def _build_form(self):
         # スクロール可能フォームエリア
@@ -569,29 +549,10 @@ class SurveyFormWindow:
             _refresh(nd, nn)
             messagebox.showinfo("完了", "登録情報を修正しました。")
 
-        def _new():
-            res = self._open_staff_dialog(dept_var.get(), "", "新規登録")
-            if not res:
-                return
-            nd, nn = res
-            try:
-                created = add_master_user(get_data_path(MASTER_USER_FILE), nd, nn)
-            except Exception as e:
-                messagebox.showerror("保存エラー", f"職員マスターの登録に失敗しました:\n{e}")
-                return
-            _refresh(nd, nn)
-            if created:
-                messagebox.showinfo("完了", f"{nn}（{nd}）を登録しました。")
-            else:
-                messagebox.showinfo("登録済み", "この職員は既に登録されています。")
-
         btn_row = tk.Frame(opts_frame, bg=CARD_BG)
         btn_row.pack(anchor="w", pady=(6, 0))
         tk.Button(btn_row, text="✏️ 登録情報の修正", font=FONT_SMALL, relief="flat",
-                  padx=6, pady=2, cursor="hand2", command=_edit).pack(side="left", padx=(0, 4))
-        tk.Button(btn_row, text="＋ 新規作成", font=FONT_SMALL, relief="flat",
-                  bg=SUCCESS, fg="white", padx=6, pady=2, cursor="hand2",
-                  command=_new).pack(side="left")
+                  padx=6, pady=2, cursor="hand2", command=_edit).pack(side="left")
 
         info["dept_var"] = dept_var
         info["name_var"] = name_var

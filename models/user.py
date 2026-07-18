@@ -71,20 +71,3 @@ def update_master_user(filepath: str, old_dept: str, old_name: str,
         if not found:
             users.append(StaffMember(department=new_dept, name=new_name))
         save_master_users(filepath, users)
-
-
-def add_master_user(filepath: str, dept: str, name: str) -> bool:
-    """
-    職員マスターに1件追加する（既に同じ部署・氏名があれば追加しない）。
-    追加したら True、既存で追加しなかった場合は False を返す。
-    """
-    dept = dept.strip()
-    name = name.strip()
-    with file_lock(filepath):
-        users = load_master_users(filepath)
-        for u in users:
-            if u.department == dept and u.name == name:
-                return False
-        users.append(StaffMember(department=dept, name=name))
-        save_master_users(filepath, users)
-    return True
