@@ -6,6 +6,8 @@ from typing import List, Dict
 import csv
 import os
 
+from utils.file_lock import file_lock
+
 
 @dataclass
 class StaffMember:
@@ -47,3 +49,42 @@ def get_departments(users: List[StaffMember]) -> List[str]:
 
 def get_names_for_department(users: List[StaffMember], department: str) -> List[str]:
     return [u.name for u in users if u.department == department]
+
+
+def update_master_user(filepath: str, old_dept: str, old_name: str,
+                       new_dept: str, new_name: str):
+    """
+    職員マスターの1件を修正する（共有フォルダ対応のためロック内で読み直して保存）。
+    該当が見つからない場合は新規として追加する。
+    """
+    new_dept = new_dept.strip()
+    new_name = new_name.strip()
+    with file_lock(filepath):
+        users = load_master_users(filepath)
+        found = False
+        for u in users:
+            if u.department == old_dept and u.name == old_name:
+                u.department = new_dept
+                u.name = new_name
+                found = True
+                break
+        if not found:
+            users.append(StaffMember(department=new_dept, name=new_name))
+        save_master_users(filepath, users)
+
+
+def add_master_user(filepath: str, dept: str, name: str) -> bool:
+    """
+    職員マスターに1件追加する（既に同じ部署・氏名があれば追加しない）。
+    追加したら True、既存で追加しなかった場合は False を返す。
+    """
+    dept = dept.strip()
+    name = name.strip()
+    with file_lock(filepath):
+        users = load_master_users(filepath)
+        for u in users:
+            if u.department == dept and u.name == name:
+                return False
+        users.append(StaffMember(department=dept, name=name))
+        save_master_users(filepath, users)
+    return True

@@ -8,10 +8,13 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 from typing import Dict, List, Optional
 
+import re
+
 from config import (get_surveys_dir, get_shared_folder, get_data_path,
                     MASTER_USER_FILE, ACCESS_LOG_FILE)
 from models.survey import Survey, Question, QUESTION_TYPES
-from models.user import load_master_users, get_departments, get_names_for_department
+from models.user import (load_master_users, get_departments, get_names_for_department,
+                         update_master_user, add_master_user)
 from utils.data_manager import save_answer, has_answered
 from utils.logger import get_hostname, get_ip_address, write_access_log
 from views.styles import (PRIMARY, BG, CARD_BG, FONT_LARGE, FONT_NORMAL, FONT_MEDIUM,
@@ -22,6 +25,86 @@ from views.styles import (PRIMARY, BG, CARD_BG, FONT_LARGE, FONT_NORMAL, FONT_ME
 # StringVar(value=_UNSELECTED) にしておくことでどの選択肢にも一致せず未選択状態になる。
 # tristatevalue はデフォルト "" のままにする（_UNSELECTED != "" のためトリステートにならない）。
 _UNSELECTED = "\x00__unselected__\x00"
+
+
+class StaffEditDialog(tk.Toplevel):
+    """職員マスターの登録情報を編集・新規作成するモーダルダイアログ。
+
+    OK を押すと self.result = (部署, 氏名) がセットされる。キャンセル時は None。
+    氏名は「姓」「名」の2つの入力欄を半角スペースで連結して保持する。
+    """
+    def __init__(self, parent, departments, title="登録情報", dept="", name=""):
+        super().__init__(parent)
+        self.result = None
+        self.title(title)
+        self.configure(bg=BG)
+        self.resizable(False, False)
+        self.transient(parent)
+
+        # 既存氏名を「姓」「名」に分割（半角/全角スペースどちらでも）
+        sei, mei = "", ""
+        if name:
+            parts = re.split(r"[ 　]", name, maxsplit=1)
+            sei = parts[0]
+            mei = parts[1] if len(parts) > 1 else ""
+
+        body = tk.Frame(self, bg=BG, padx=20, pady=16)
+        body.pack(fill="both", expand=True)
+
+        # 所属（リストから選択）
+        tk.Label(body, text="所属:", font=FONT_NORMAL, bg=BG).grid(
+            row=0, column=0, sticky="w", pady=6)
+        self._dept_var = tk.StringVar(value=dept)
+        dept_cb = ttk.Combobox(body, textvariable=self._dept_var, values=departments,
+                               state="readonly", font=FONT_NORMAL, width=24)
+        dept_cb.grid(row=0, column=1, columnspan=3, sticky="w", pady=6, padx=(6, 0))
+
+        # 氏名（姓・名の2欄）
+        tk.Label(body, text="氏名:", font=FONT_NORMAL, bg=BG).grid(
+            row=1, column=0, sticky="w", pady=6)
+        self._sei_var = tk.StringVar(value=sei)
+        self._mei_var = tk.StringVar(value=mei)
+        sei_entry = tk.Entry(body, textvariable=self._sei_var, font=FONT_NORMAL,
+                             width=11, relief="solid", bd=1)
+        sei_entry.grid(row=1, column=1, sticky="w", pady=6, padx=(6, 2), ipady=3)
+        tk.Label(body, text="姓", font=FONT_SMALL, bg=BG, fg=MUTED).grid(
+            row=2, column=1, sticky="w")
+        mei_entry = tk.Entry(body, textvariable=self._mei_var, font=FONT_NORMAL,
+                             width=11, relief="solid", bd=1)
+        mei_entry.grid(row=1, column=2, sticky="w", pady=6, padx=(2, 0), ipady=3)
+        tk.Label(body, text="名", font=FONT_SMALL, bg=BG, fg=MUTED).grid(
+            row=2, column=2, sticky="w")
+
+        # ボタン
+        btn_row = tk.Frame(body, bg=BG)
+        btn_row.grid(row=3, column=0, columnspan=4, pady=(14, 0), sticky="e")
+        tk.Button(btn_row, text="キャンセル", font=FONT_NORMAL, relief="flat",
+                  padx=12, pady=5, command=self._cancel).pack(side="right", padx=4)
+        tk.Button(btn_row, text="保存", font=FONT_NORMAL, bg=SUCCESS, fg="white",
+                  relief="flat", padx=16, pady=5, command=self._ok).pack(side="right")
+
+        (sei_entry if not dept else dept_cb).focus_set()
+        self.bind("<Return>", lambda e: self._ok())
+        self.bind("<Escape>", lambda e: self._cancel())
+        self.grab_set()
+
+    def _ok(self):
+        dept = self._dept_var.get().strip()
+        sei = self._sei_var.get().strip()
+        mei = self._mei_var.get().strip()
+        if not dept:
+            messagebox.showwarning("入力エラー", "所属を選択してください", parent=self)
+            return
+        if not sei:
+            messagebox.showwarning("入力エラー", "姓を入力してください", parent=self)
+            return
+        full = f"{sei} {mei}".strip() if mei else sei
+        self.result = (dept, full)
+        self.destroy()
+
+    def _cancel(self):
+        self.result = None
+        self.destroy()
 
 
 class SurveyListWindow:
@@ -181,6 +264,7 @@ class SurveyFormWindow:
         dept_cb = ttk.Combobox(inner, textvariable=self._dept_var, values=depts,
                                state="readonly", font=FONT_NORMAL, width=16)
         dept_cb.pack(side="left", padx=6)
+        self._dept_cb = dept_cb
 
         if not self.survey.anonymous_name_only:
             # 通常モード: 氏名も選択
@@ -190,6 +274,14 @@ class SurveyFormWindow:
                                          state="readonly", font=FONT_NORMAL, width=16)
             self._name_cb.pack(side="left", padx=6)
             dept_cb.bind("<<ComboboxSelected>>", self._on_dept_change)
+
+            # 職員マスターの自己編集ボタン
+            tk.Button(inner, text="✏️ 登録情報の修正", font=FONT_SMALL, relief="flat",
+                      padx=6, pady=2, cursor="hand2",
+                      command=self._edit_my_staff).pack(side="left", padx=(12, 2))
+            tk.Button(inner, text="＋ 新規作成", font=FONT_SMALL, relief="flat",
+                      bg=SUCCESS, fg="white", padx=6, pady=2, cursor="hand2",
+                      command=self._new_my_staff).pack(side="left", padx=2)
         else:
             # 部署のみ匿名モード: 氏名は収集しない
             tk.Label(inner, text="（氏名は記録されません）", font=FONT_SMALL,
@@ -206,6 +298,61 @@ class SurveyFormWindow:
             names = get_names_for_department(self._users, dept)
             self._name_cb["values"] = names
             self._name_var.set("")
+
+    # ───── 職員マスターの自己編集 ─────
+    def _reload_master(self):
+        self._users = load_master_users(get_data_path(MASTER_USER_FILE))
+
+    def _open_staff_dialog(self, dept="", name="", title="登録情報の修正"):
+        depts = get_departments(self._users)
+        dlg = StaffEditDialog(self.root, depts, title=title, dept=dept, name=name)
+        self.root.wait_window(dlg)
+        return dlg.result
+
+    def _refresh_top_selector(self, sel_dept, sel_name):
+        self._dept_cb["values"] = get_departments(self._users)
+        self._dept_var.set(sel_dept)
+        if self._name_cb is not None:
+            self._name_cb["values"] = get_names_for_department(self._users, sel_dept)
+            self._name_var.set(sel_name)
+
+    def _edit_my_staff(self):
+        dept = self._dept_var.get()
+        name = self._name_var.get()
+        if not dept or not name:
+            messagebox.showwarning("選択なし",
+                "修正する職員を部署・氏名から選択してください。")
+            return
+        res = self._open_staff_dialog(dept, name, "登録情報の修正")
+        if not res:
+            return
+        new_dept, new_name = res
+        try:
+            update_master_user(get_data_path(MASTER_USER_FILE),
+                               dept, name, new_dept, new_name)
+        except Exception as e:
+            messagebox.showerror("保存エラー", f"職員マスターの更新に失敗しました:\n{e}")
+            return
+        self._reload_master()
+        self._refresh_top_selector(new_dept, new_name)
+        messagebox.showinfo("完了", "登録情報を修正しました。")
+
+    def _new_my_staff(self):
+        res = self._open_staff_dialog(self._dept_var.get(), "", "新規登録")
+        if not res:
+            return
+        new_dept, new_name = res
+        try:
+            created = add_master_user(get_data_path(MASTER_USER_FILE), new_dept, new_name)
+        except Exception as e:
+            messagebox.showerror("保存エラー", f"職員マスターの登録に失敗しました:\n{e}")
+            return
+        self._reload_master()
+        self._refresh_top_selector(new_dept, new_name)
+        if created:
+            messagebox.showinfo("完了", f"{new_name}（{new_dept}）を登録しました。")
+        else:
+            messagebox.showinfo("登録済み", "この職員は既に登録されています。")
 
     def _build_form(self):
         # スクロール可能フォームエリア
@@ -395,6 +542,56 @@ class SurveyFormWindow:
             name_cb["values"] = names
             name_var.set("")
         dept_cb.bind("<<ComboboxSelected>>", _on_dept)
+
+        # 職員マスターの自己編集ボタン
+        def _refresh(sel_dept, sel_name):
+            self._reload_master()
+            dept_cb["values"] = get_departments(self._users)
+            dept_var.set(sel_dept)
+            name_cb["values"] = get_names_for_department(self._users, sel_dept)
+            name_var.set(sel_name)
+
+        def _edit():
+            d, n = dept_var.get(), name_var.get()
+            if not d or not n:
+                messagebox.showwarning("選択なし",
+                    "修正する職員を部署・氏名から選択してください。")
+                return
+            res = self._open_staff_dialog(d, n, "登録情報の修正")
+            if not res:
+                return
+            nd, nn = res
+            try:
+                update_master_user(get_data_path(MASTER_USER_FILE), d, n, nd, nn)
+            except Exception as e:
+                messagebox.showerror("保存エラー", f"職員マスターの更新に失敗しました:\n{e}")
+                return
+            _refresh(nd, nn)
+            messagebox.showinfo("完了", "登録情報を修正しました。")
+
+        def _new():
+            res = self._open_staff_dialog(dept_var.get(), "", "新規登録")
+            if not res:
+                return
+            nd, nn = res
+            try:
+                created = add_master_user(get_data_path(MASTER_USER_FILE), nd, nn)
+            except Exception as e:
+                messagebox.showerror("保存エラー", f"職員マスターの登録に失敗しました:\n{e}")
+                return
+            _refresh(nd, nn)
+            if created:
+                messagebox.showinfo("完了", f"{nn}（{nd}）を登録しました。")
+            else:
+                messagebox.showinfo("登録済み", "この職員は既に登録されています。")
+
+        btn_row = tk.Frame(opts_frame, bg=CARD_BG)
+        btn_row.pack(anchor="w", pady=(6, 0))
+        tk.Button(btn_row, text="✏️ 登録情報の修正", font=FONT_SMALL, relief="flat",
+                  padx=6, pady=2, cursor="hand2", command=_edit).pack(side="left", padx=(0, 4))
+        tk.Button(btn_row, text="＋ 新規作成", font=FONT_SMALL, relief="flat",
+                  bg=SUCCESS, fg="white", padx=6, pady=2, cursor="hand2",
+                  command=_new).pack(side="left")
 
         info["dept_var"] = dept_var
         info["name_var"] = name_var
